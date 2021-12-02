@@ -1,0 +1,1 @@
+/home/adamgatt/coding/rust/aoc2021/target/debug/aoc2021: /home/adamgatt/coding/rust/aoc2021/src/main.rs /home/adamgatt/coding/rust/aoc2021/src/solutions/solution1.rs /home/adamgatt/coding/rust/aoc2021/src/solutions/solution2.rs /home/adamgatt/coding/rust/aoc2021/src/solutions.rs /home/adamgatt/coding/rust/aoc2021/src/utils.rs
