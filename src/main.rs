@@ -4,7 +4,7 @@ mod solutions;
 use std::io;
 
 const MIN_CHOICE: i32 = 1;
-const MAX_CHOICE: i32 = 2;
+const MAX_CHOICE: i32 = 3;
 
 fn main() {
     solutions::run(make_selection());
