@@ -22,7 +22,7 @@ pub fn read_string_int_tuples(path: &str) -> Vec<(String, i32)> {
         .expect("Error parsing data as list of (String, i32)s")
 }
 
-fn iterate_file_lines(path: &str) -> impl Iterator<Item = Result<String, Box<dyn Error>>> {
+pub fn iterate_file_lines(path: &str) -> impl Iterator<Item = Result<String, Box<dyn Error>>> {
     let file = File::open(path).expect(&format!("Unable to open file at {}", path));
     BufReader::new(file)
         .lines()
