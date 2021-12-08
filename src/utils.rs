@@ -15,6 +15,13 @@ pub fn read_number_lines(path: &str) -> Vec<i32> {
         .expect("Error parsing data as list of i32s")
 }
 
+pub fn read_lines_by_words(path: &str) -> Vec<Vec<String>> {
+    iterate_file_lines(path)
+        .map(parse_as_word_list)
+        .collect::<Result<Vec<Vec<String>>, Box<dyn Error>>>()
+        .expect("Error parsing data as list of word lists")
+}
+
 pub fn read_string_int_tuples(path: &str) -> Vec<(String, i32)> {
     iterate_file_lines(path)
         .map(parse_as_string_int_tuple)
@@ -42,6 +49,15 @@ fn parse_as_int(string_result: Result<String, Box<dyn Error>>) -> Result<i32, Bo
         |str_value| str_value
             .parse::<i32>()
             .map_err(box_error)
+    )
+}
+
+fn parse_as_word_list(string_result: Result<String, Box<dyn Error>>) -> Result<Vec<String>, Box<dyn Error>> {
+    string_result.map(
+        |str_value| str_value
+            .split_whitespace()
+            .map(String::from)
+            .collect::<Vec<String>>()
     )
 }
 
