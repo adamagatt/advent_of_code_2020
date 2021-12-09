@@ -37,6 +37,15 @@ pub fn read_int_line(path: &str, separator: char) -> Vec<i32> {
         .collect::<Vec<i32>>()
 }
 
+pub fn read_2d_int_array(path: &str) -> Vec<Vec<u8>> {
+    iterate_file_lines(path)
+        .map(|line| line.unwrap().chars()
+            .map(|digit| digit.to_digit(10).expect("Non-digit character found") as u8)
+            .collect::<Vec<u8>>()
+        )
+        .collect::<Vec<Vec<u8>>>()
+}
+
 pub fn iterate_file_lines(path: &str) -> impl Iterator<Item = Result<String, Box<dyn Error>>> {
     let file = File::open(path).expect(&format!("Unable to open file at {}", path));
     BufReader::new(file)

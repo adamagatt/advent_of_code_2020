@@ -6,8 +6,9 @@ mod solution5;
 mod solution6;
 mod solution7;
 mod solution8;
+mod solution9;
 
-pub const MAX_SOLUTION: i32 = 8;
+pub const MAX_SOLUTION: i32 = 9;
 
 pub fn run(choice: i32) -> () {
     match choice {
@@ -19,6 +20,7 @@ pub fn run(choice: i32) -> () {
         6 => solution6::solution6(),
         7 => solution7::solution7(),
         8 => solution8::solution8(),
+        9 => solution9::solution9(),
         _ => ()
     }
 }
