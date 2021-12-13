@@ -9,6 +9,7 @@ mod solution8;
 mod solution9;
 mod solution10;
 mod solution11;
+mod solution12;
 mod solution13;
 
 pub const MAX_SOLUTION: i32 = 13;
@@ -26,6 +27,7 @@ pub fn run(choice: i32) -> () {
         9 => solution9::solution9(),
         10 => solution10::solution10(),
         11 => solution11::solution11(),
+        12 => solution12::solution12(),
         13 => solution13::solution13(),
         _ => ()
     }

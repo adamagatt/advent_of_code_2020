@@ -46,6 +46,18 @@ pub fn read_2d_int_array(path: &str) -> Vec<Vec<u8>> {
         .collect::<Vec<Vec<u8>>>()
 }
 
+pub fn read_string_pairs(path: &str, separator: char) -> Vec<(String, String)> {
+    iterate_file_lines(path)
+        .map(|pair_str| {
+            let tokens = pair_str.unwrap()
+                .split(separator)
+                .map(String::from)
+                .collect::<Vec<String>>();
+            (tokens[0].clone(), tokens[1].clone())
+        })
+        .collect::<Vec<(String, String)>>()
+}
+
 pub fn iterate_file_lines(path: &str) -> impl Iterator<Item = Result<String, Box<dyn Error>>> {
     let file = File::open(path).expect(&format!("Unable to open file at {}", path));
     BufReader::new(file)
