@@ -13,7 +13,7 @@ fn solution16a(root_packet: &Packet) -> u32 {
     root_packet.version_sum()
 }
 
-fn solution16b(root_packet: &Packet) -> u32 {
+fn solution16b(root_packet: &Packet) -> u128 {
     root_packet.eval()
 }
 
@@ -26,10 +26,6 @@ fn parse_bytes(code_str: &String) -> Vec<bool> {
             byte &   8 ==   8, byte &  4 ==  4, byte &  2 ==  2, byte &  1 ==  1
         ])
         .collect::<Vec<bool>>()
-}
-
-fn print_bits(bit_string: &[bool], length: usize) -> () {
-    println!("{}", bit_string.iter().take(length).map(|&x| if x {'1'} else {'0'}).collect::<String>());
 }
 
 // Parse a specified number of bits into a numeric value 
@@ -46,10 +42,22 @@ fn read_num(bit_string: &[bool], length: usize) -> u32 {
 
 fn parse_packet(bit_string: &[bool]) -> Packet {
     let version = read_num(&bit_string, 3) as u8;
-    // Read operator to determine the type of patcket this is
-    let (data, data_length) = match read_num(&bit_string[3..], 3) {
-        4 => read_literal(&bit_string[6..]),
-        _ => parse_subpackets(&bit_string[6..])
+    let operator_num = read_num(&bit_string[3..], 3);
+
+    // Compare on operator to determine the type of patcket this is
+    let (data, data_length) = if operator_num == 4 {
+        read_literal(&bit_string[6..])
+    } else {
+        parse_subpackets(&bit_string[6..], match operator_num {
+            0 => Operator::SUM,
+            1 => Operator::PRODUCT,
+            2 => Operator::MINIMUM,
+            3 => Operator::MAXIMUM,
+            5 => Operator::GREATER,
+            6 => Operator::LESSER,
+            7 => Operator::EQUAL,
+            _ => panic!("Invalid operator found!")
+        })
     };
 
     Packet{
@@ -60,11 +68,11 @@ fn parse_packet(bit_string: &[bool]) -> Packet {
 
 // Use 5-bit batch parsing method to read literal values
 fn read_literal(bit_string: &[bool]) -> (Data, usize) {
-    let mut groups = Vec::<u32>::new();
+    let mut groups = Vec::<u64>::new();
     let mut cur_index = 0;
 
     loop {
-        groups.push(read_num(&bit_string[cur_index+1..], 4));
+        groups.push(read_num(&bit_string[cur_index+1..], 4) as u64);
         // Only proceed to next batch if leading bit is 1
         if !bit_string[cur_index] {
             break;
@@ -75,7 +83,7 @@ fn read_literal(bit_string: &[bool]) -> (Data, usize) {
     let data = Data::Literal(
         groups.iter()
             .copied()
-            .reduce(|acc, group| (acc << 4 + group))
+            .reduce(|acc, group| (acc << 4) + group)
             .expect("Literal data had no groups")
             .clone()
     );
@@ -84,7 +92,7 @@ fn read_literal(bit_string: &[bool]) -> (Data, usize) {
     
 }
 
-fn parse_subpackets(bit_string: &[bool]) -> (Data, usize) {
+fn parse_subpackets(bit_string: &[bool], operator: Operator) -> (Data, usize) {
     let length = if bit_string[0] {
         // First bit ON indicates number of subpackets
         Length::Subpackets(read_num(&bit_string[1..], 11) as usize)
@@ -103,9 +111,9 @@ fn parse_subpackets(bit_string: &[bool]) -> (Data, usize) {
     loop {
         let subpacket = parse_packet(&bit_string[(header_bits+total_bit_length)..]);
 
+        // Update totals and add parsed packed to subpacket list
         total_bit_length += subpacket.bit_length;
         subpacket_count += 1;
-
         subpackets.push(subpacket);
 
         // The condition to stop reading depends on the length strategy
@@ -118,7 +126,7 @@ fn parse_subpackets(bit_string: &[bool]) -> (Data, usize) {
     }
 
     let data = Data::Operator(
-        OperatorPacket { length, subpackets }
+        OperatorPacket { operator, subpackets }
     );
 
     (data, header_bits + total_bit_length)
@@ -133,7 +141,8 @@ enum Length {
 }
 
 enum Data {
-    Literal(u32),
+    // Some literal values exceed unsigned 32-bit representation
+    Literal(u64),
     Operator(OperatorPacket)
 }
 
@@ -141,6 +150,13 @@ struct Packet {
     version: u8,
     bit_length: usize,
     data: Data
+}
+
+enum Operator {SUM, PRODUCT, MINIMUM, MAXIMUM, GREATER, LESSER, EQUAL}
+
+struct OperatorPacket {
+    operator: Operator,
+    subpackets: Vec<Packet>
 }
 
 impl Packet {
@@ -154,12 +170,26 @@ impl Packet {
         }
     }
 
-    fn eval(&self) -> u32 {
-        5
-    }
-}
+    fn eval(&self) -> u128 {
+        match &self.data {
+            // Literals need no operation, just return their value
+            // 128-bit needed for handling large products
+            Data::Literal(value) => *value as u128,
+            Data::Operator(operator_packet) => {
+                // Prepare (lazy-evaluated) evaluations of subpackets in advance for use by the
+                // possible operators
+                let values = operator_packet.subpackets.iter().map(|packet| packet.eval());
 
-struct OperatorPacket {
-    length: Length,
-    subpackets: Vec<Packet>
+                match &operator_packet.operator {
+                    Operator::SUM => values.sum(),
+                    Operator::PRODUCT => values.product(),
+                    Operator::MINIMUM => values.min().expect("No subpackets!"),
+                    Operator::MAXIMUM => values.max().expect("No subpackets!"),
+                    Operator::GREATER => values.take(2).reduce(|first, second| if first > second {1} else {0}).expect("Not enough subpackets!"),
+                    Operator::LESSER => values.take(2).reduce(|first, second| if first < second {1} else {0}).expect("Not enough subpackets!"),
+                    Operator::EQUAL => values.take(2).reduce(|first, second| if first == second {1} else {0}).expect("Not enough subpackets!")
+                }
+            }
+        }
+    }
 }
