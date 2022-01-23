@@ -13,10 +13,10 @@ fn solution17a(target_area: &TargetArea) -> i32 {
     // considered is the distance between the origin and the bottom of
     // the target area. Velocities larger than this are likely to skip
     // over the entire target area in one step.
-    for y_vel in (0..(-target_area.min_y)).rev() {
+    for y_vel in (target_area.min_y..=(-target_area.min_y)).rev() {
         // Search from 0 x velocity to a value that would skip past the
         // target area in a single step
-        for x_vel in 1..(target_area.max_x) {
+        for x_vel in 0..=(target_area.max_x) {
             if probe_ends_within_area(
                 Probe {x_pos: 0, y_pos: 0, x_vel, y_vel},
                 target_area
@@ -29,7 +29,21 @@ fn solution17a(target_area: &TargetArea) -> i32 {
 }
 
 fn solution17b(target_area: &TargetArea) -> i32 {
-    5
+    let mut success_count = 0;
+
+    // Same search criteria as in part A
+    // Could also be done as an iterator stream and filter/count
+    for y_vel in target_area.min_y..=(-target_area.min_y) {
+        for x_vel in 0..=(target_area.max_x) {
+            if probe_ends_within_area(
+                Probe {x_pos: 0, y_pos: 0, x_vel, y_vel},
+                target_area
+            ) {
+                success_count += 1;
+            }
+        }
+    }
+    success_count
 }
 
 fn probe_ends_within_area(mut probe: Probe, target_area: &TargetArea) -> bool {
@@ -43,7 +57,9 @@ fn probe_ends_within_area(mut probe: Probe, target_area: &TargetArea) -> bool {
 }
 
 fn end_simulation(probe: &Probe, target_area: &TargetArea) -> bool {
+    // If the probe is now further than the target area
     probe.x_pos > target_area.max_x
+    // If the probe is below the target area and descending
     || (probe.y_pos < target_area.min_y && probe.y_vel < 0)
 }
 
@@ -57,6 +73,8 @@ fn update_probe(probe: &mut Probe) {
 }
 
 fn height_for_initial_y_vel(y_vel: i32) -> i32 {
+    // Total height with motion rules used is triangular quadratic relative to
+    // the initial y velocity
     (y_vel * (y_vel + 1)) / 2
 }
 
