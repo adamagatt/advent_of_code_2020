@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 itertools = "0.10.1"
 hex = "0.4.3"
+regex = "1.5.4"
