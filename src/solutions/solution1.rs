@@ -1,16 +1,16 @@
 use crate::utils::read_number_lines;
 
-pub fn solution1() -> (){
+pub fn solution1() {
     let depths = read_number_lines("src/data/solution1.txt");
     println!("{}", solution1a(&depths));
     println!("{}", solution1b(&depths));
 }
 
 fn solution1a(depths: &[i32]) -> i32 {
-    *(&depths[1..].iter() // Zip slice [1..] with slice starting from beginning
+    depths[1..].iter() // Zip slice [1..] with slice starting from beginning
         .zip(depths.iter())
         .filter(|(a, b)| **a > **b)
-        .count()) as i32
+        .count() as i32
 }
 
 /**
@@ -22,8 +22,8 @@ fn solution1a(depths: &[i32]) -> i32 {
  * in essence we can continue comparing individual values, just with an offset of 3.
  */
 fn solution1b(depths: &[i32]) -> i32 {
-    *(&depths[3..].iter()
+    depths[3..].iter()
         .zip(depths.iter())
         .filter(|(a, b)| **a > **b)
-        .count()) as i32
+        .count() as i32
 }

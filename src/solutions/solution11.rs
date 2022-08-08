@@ -3,14 +3,14 @@ use crate::utils::read_2d_int_array;
 type OctopusGraph = Vec<Vec<u8>>;
 type FlashGraph = Vec<Vec<bool>>;
 
-pub fn solution11() -> () {
+pub fn solution11() {
     let octopi = read_2d_int_array("src/data/solution11.txt");
     println!("{}", solution11a(&octopi));
     println!("{}", solution11b(octopi));
 }
 
 fn solution11a(octopi_in: &OctopusGraph) -> usize {
-    let mut octopi = octopi_in.iter().cloned().collect::<OctopusGraph>();
+    let mut octopi = octopi_in.to_vec();
     let mut flashes = 0;
 
     for _ in 0..100 {
@@ -31,27 +31,27 @@ fn solution11b(mut octopi: OctopusGraph) -> usize {
         }
     }
     // Unnecessary, as we will never break from the above loop
-    return 0;
+    0
 }
 
-fn run_simulation(mut octopi: &mut OctopusGraph) -> usize {
+fn run_simulation(octopi: &mut OctopusGraph) -> usize {
     let mut new_flashes = 0;
     let mut flashed = vec![vec![false; octopi[0].len()]; octopi.len()];
-    advanced(&mut octopi);
+    advanced(octopi);
 
-    while let Some(coords) = ready_to_flash(&octopi, &flashed) {
+    while let Some(coords) = ready_to_flash(octopi, &flashed) {
         new_flashes += coords.len();
         for (row, col) in coords {
             flashed[row][col] = true;
-            increase_around_flash(&mut octopi, row, col);
+            increase_around_flash(octopi, row, col);
         }
     }
-    reset_flashed(&mut octopi, flashed);
+    reset_flashed(octopi, flashed);
     
     new_flashes
 }
 
-fn advanced(octopi: &mut OctopusGraph) -> () {
+fn advanced(octopi: &mut OctopusGraph) {
     octopi.iter_mut()
         .flat_map(|line| line.iter_mut())
         .for_each(|value| *value += 1);
@@ -74,14 +74,14 @@ fn ready_to_flash(octopi: &OctopusGraph, flashed_graph: &FlashGraph) -> Option<V
         .collect::<Vec<(usize, usize)>>();
 
     // If there are no flash locations we prefer to return None than an empty Vec
-    if flash_list.len() > 0 {
+    if !flash_list.is_empty() {
         Some(flash_list)
     } else {
         None
     }
 }
 
-fn increase_around_flash(octopi: &mut OctopusGraph, row: usize, col: usize) -> () {
+fn increase_around_flash(octopi: &mut OctopusGraph, row: usize, col: usize) {
     for neighbour_row in usize::saturating_sub(row, 1)..=(row+1) {
         for neighbour_col in usize::saturating_sub(col, 1)..=(col+1) {
             // Check within bounds (no need to check >0 due to saturating_sub)
@@ -94,7 +94,7 @@ fn increase_around_flash(octopi: &mut OctopusGraph, row: usize, col: usize) -> (
     }
 }
 
-fn reset_flashed(octopi: &mut OctopusGraph, flashed_graph: FlashGraph) -> () {
+fn reset_flashed(octopi: &mut OctopusGraph, flashed_graph: FlashGraph) {
     octopi.iter_mut()
         .zip(flashed_graph.iter())
         // Flatten graph to address memory locations in a linear iteration

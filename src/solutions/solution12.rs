@@ -17,12 +17,12 @@ pub fn solution12 () {
 
 fn solution12a(cave_map: &CaveMap) -> i32 {
     let visited_caves = HashSet::<String>::new();
-    explore_cave(&cave_map["start"], &cave_map, &visited_caves, false)
+    explore_cave(&cave_map["start"], cave_map, &visited_caves, false)
 }
 
 fn solution12b(cave_map: &CaveMap) -> i32 {
     let visited_caves = HashSet::<String>::new();
-    explore_cave(&cave_map["start"], &cave_map, &visited_caves, true)
+    explore_cave(&cave_map["start"], cave_map, &visited_caves, true)
 }
 
 fn build_cave_map(connections: &Vec<(String, String)>) -> CaveMap {
@@ -76,7 +76,7 @@ fn explore_cave(cave: &Cave, cave_map: &CaveMap, visited: &HashSet<String>, can_
                     None
                 }
             })
-            .map(|(dest_cave, new_can_revisit)| explore_cave(&dest_cave, cave_map, &new_visited, new_can_revisit))
+            .map(|(dest_cave, new_can_revisit)| explore_cave(dest_cave, cave_map, &new_visited, new_can_revisit))
             .sum() // We want the sum of descendents that eventually get to "end" (return 1)
     }
 }

@@ -1,7 +1,7 @@
 use crate::utils::read_string_lines;
 use std::collections::HashSet;
 
-pub fn solution3() -> () {
+pub fn solution3() {
     let readings = read_string_lines("src/data/solution3.txt");
     println!("{}", solution3a(&readings));
     println!("{}", solution3b(&readings));
@@ -17,6 +17,7 @@ enum FilterStrategy {
 fn solution3a(readings: &[String]) -> u32 {
     let num_readings = readings.len() as i32;
     let gamma_str = readings.iter()
+        .map(|s| s.as_str())
         // We want to build up one counter for each character position (over each reading)
         .fold([0; LENGTH], update_counters_with_reading)
         .iter()
@@ -29,14 +30,13 @@ fn solution3a(readings: &[String]) -> u32 {
     gamma * (!gamma & 0xFFF) // Multiply by inverted bitstring (restricted to bottom 12 bits)
 }
 
-fn update_counters_with_reading(mut counters: [i32; LENGTH], reading: &String) -> [i32; LENGTH] {
-    for idx in 1..LENGTH {
-        // unwrap() character access as we assume each reading is at
-        // least LENGTH characters long
-        if reading.chars().nth(idx).unwrap() == '1' {
-            counters[idx] += 1
-        }
-    }
+fn update_counters_with_reading(mut counters: [i32; LENGTH], reading: &str) -> [i32; LENGTH] {
+    reading.chars()
+        .zip(counters.iter_mut())
+        .take(LENGTH).skip(1)
+        .filter(|(char, _)| *char == '1')
+        .for_each(|(_, counter)| *counter += 1);
+
     counters
 }
 
@@ -51,7 +51,7 @@ fn solution3b(readings: &[String]) -> u32 {
         * u32::from_str_radix(co2_code.as_str(), 2).unwrap()
 }
 
-fn filter_algorithm<'a>(mut candidates: HashSet<&'a String>, filter_strategy: FilterStrategy) -> &'a String {
+fn filter_algorithm(mut candidates: HashSet<&String>, filter_strategy: FilterStrategy) -> &String {
     // One round of elimination for each character, with potential for early exit
     for pos in 0..LENGTH {
         let mut filter_value = most_common_at_position(&candidates, pos);
@@ -81,9 +81,5 @@ fn most_common_at_position(candidates: &HashSet<&String>, pos: usize) -> char {
     let ones_count = candidates.iter()
         .filter(|candidate| candidate.chars().nth(pos).unwrap() == '1')
         .count() as f32;
-    if ones_count >= threshold {
-        '1'
-    } else {
-        '0'
-    }
+    if ones_count >= threshold {'1'} else {'0'}
 }

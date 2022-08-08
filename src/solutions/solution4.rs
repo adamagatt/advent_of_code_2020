@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use crate::utils::read_string_lines;
 
-pub fn solution4() -> () {
+pub fn solution4() {
     let input_lines = read_string_lines("src/data/solution4.txt");
     println!("{}", solution4a(&input_lines));
     println!("{}", solution4b(&input_lines));
@@ -73,7 +73,7 @@ fn solution4b(input_lines: &[String]) -> i32 {
     for draw in draws {   
         mark_drawn_spaces(&mut spaces_for_draw, draw);
 
-        assert!(boards.len() != 0, "All boards were eliminated!");
+        assert!(!boards.is_empty(), "All boards were eliminated!");
 
         // Eliminate solved boards
         if boards.len() > 1 {
@@ -90,7 +90,7 @@ fn solution4b(input_lines: &[String]) -> i32 {
     panic!("Multiple unsolved boards still remain!");
 }
 
-fn mark_drawn_spaces(spaces_for_draw: &mut HashMap<i32, Vec<SpaceRef>>, draw: i32) -> () {  
+fn mark_drawn_spaces(spaces_for_draw: &mut HashMap<i32, Vec<SpaceRef>>, draw: i32) {  
     if let Some(space_list) = spaces_for_draw.get_mut(&draw) {
         for space in space_list {
             *(space.borrow_mut()) = Space::Marked;

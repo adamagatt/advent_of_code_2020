@@ -29,7 +29,7 @@ fn solution14b(template: &str, children: &Children) -> usize {
 fn polymer_algorithm(template: &str, children: &Children, iterations: usize) -> usize {
     // Create the counters for the character content of each base polymer at the
     // first generation, before any insertion iterations have happened
-    let mut generation_counters = vec![create_first_generation(&children)];
+    let mut generation_counters = vec![create_first_generation(children)];
 
     // We proceed through each iteration, calculating the histogram of characters that an
     // original polymer would have expanded to by that iteration
@@ -113,7 +113,7 @@ fn calculate_final_counter(template: &str, generation: &Generation) -> Counter {
     // The last character in the string is absent from all counters and so we
     // add it back in manually after all other processing
     *final_counter
-        .get_mut(&mut template.chars()
+        .get_mut(&template.chars()
             .last()
             .unwrap()
         )
@@ -123,7 +123,7 @@ fn calculate_final_counter(template: &str, generation: &Generation) -> Counter {
 }
 
 fn difference_most_least_common(counter: Counter) -> usize {
-    let mut most = 0 as usize;
+    let mut most = 0_usize;
     let mut least = usize::MAX;
 
     for &value in counter.values() {
@@ -140,7 +140,7 @@ fn parse_input(lines: Vec<String>) -> (String, Children) {
     let children = lines.iter()
         // Begin reading from 3rd line to get ruleset
         .skip(2)
-        .take_while(|line| line.len() > 0)
+        .take_while(|line| !line.is_empty())
         // Positions of characters of interest are the same for every line
         .map(|rule| {
             let left_char = rule.chars().nth(0).unwrap();

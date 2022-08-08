@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 type VentLine = [(usize, usize); 2];
 
-pub fn solution5() -> () {
+pub fn solution5() {
     let vent_lines = parse_vent_lines(&read_string_lines("src/data/solution5.txt"));
     println!("{}", solution5a(&vent_lines));
     println!("{}", solution5b(&vent_lines));
@@ -70,7 +70,7 @@ fn parse_vent_lines(lines: &[String]) -> Vec<VentLine> {
     lines.iter()
         .map(|line| {
             let pairs = line.split("->").map(|pair|
-                pair.split(",")
+                pair.split(',')
                     .map(|num_str| usize::from_str(num_str.trim()).unwrap())
                     .next_tuple().unwrap()
             ).collect::<Vec<(usize, usize)>>();

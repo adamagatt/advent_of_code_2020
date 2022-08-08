@@ -1,6 +1,6 @@
 use crate::utils::read_string_int_tuples;
 
-pub fn solution2() -> (){
+pub fn solution2(){
     let commands = read_string_int_tuples("src/data/solution2.txt");
     println!("{}", solution2a(&commands));
     println!("{}", solution2b(&commands));

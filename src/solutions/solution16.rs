@@ -32,8 +32,8 @@ fn parse_bytes(code_str: &String) -> Vec<bool> {
 fn read_num(bit_string: &[bool], length: usize) -> u32 {
     let mut output = 0u32;
     
-    for idx in 0..length {
-        if bit_string[idx] {
+    for (idx, bit) in bit_string.iter().enumerate().take(length) {
+        if *bit {
             output += 1 << (length - idx - 1);
         }
     }
@@ -41,7 +41,7 @@ fn read_num(bit_string: &[bool], length: usize) -> u32 {
 }
 
 fn parse_packet(bit_string: &[bool]) -> Packet {
-    let version = read_num(&bit_string, 3) as u8;
+    let version = read_num(bit_string, 3) as u8;
     let operator_num = read_num(&bit_string[3..], 3);
 
     // Compare on operator to determine the type of patcket this is
@@ -49,13 +49,13 @@ fn parse_packet(bit_string: &[bool]) -> Packet {
         read_literal(&bit_string[6..])
     } else {
         parse_subpackets(&bit_string[6..], match operator_num {
-            0 => Operator::SUM,
-            1 => Operator::PRODUCT,
-            2 => Operator::MINIMUM,
-            3 => Operator::MAXIMUM,
-            5 => Operator::GREATER,
-            6 => Operator::LESSER,
-            7 => Operator::EQUAL,
+            0 => Operator::Sum,
+            1 => Operator::Product,
+            2 => Operator::Minimum,
+            3 => Operator::Maximum,
+            5 => Operator::Greater,
+            6 => Operator::Lesser,
+            7 => Operator::Equal,
             _ => panic!("Invalid operator found!")
         })
     };
@@ -85,7 +85,6 @@ fn read_literal(bit_string: &[bool]) -> (Data, usize) {
             .copied()
             .reduce(|acc, group| (acc << 4) + group)
             .expect("Literal data had no groups")
-            .clone()
     );
 
     (data, groups.len() * 5)
@@ -152,7 +151,7 @@ struct Packet {
     data: Data
 }
 
-enum Operator {SUM, PRODUCT, MINIMUM, MAXIMUM, GREATER, LESSER, EQUAL}
+enum Operator {Sum, Product, Minimum, Maximum, Greater, Lesser, Equal}
 
 struct OperatorPacket {
     operator: Operator,
@@ -181,13 +180,13 @@ impl Packet {
                 let values = operator_packet.subpackets.iter().map(|packet| packet.eval());
 
                 match &operator_packet.operator {
-                    Operator::SUM => values.sum(),
-                    Operator::PRODUCT => values.product(),
-                    Operator::MINIMUM => values.min().expect("No subpackets!"),
-                    Operator::MAXIMUM => values.max().expect("No subpackets!"),
-                    Operator::GREATER => values.take(2).reduce(|first, second| if first > second {1} else {0}).expect("Not enough subpackets!"),
-                    Operator::LESSER => values.take(2).reduce(|first, second| if first < second {1} else {0}).expect("Not enough subpackets!"),
-                    Operator::EQUAL => values.take(2).reduce(|first, second| if first == second {1} else {0}).expect("Not enough subpackets!")
+                    Operator::Sum => values.sum(),
+                    Operator::Product => values.product(),
+                    Operator::Minimum => values.min().expect("No subpackets!"),
+                    Operator::Maximum => values.max().expect("No subpackets!"),
+                    Operator::Greater => values.take(2).reduce(|first, second| if first > second {1} else {0}).expect("Not enough subpackets!"),
+                    Operator::Lesser => values.take(2).reduce(|first, second| if first < second {1} else {0}).expect("Not enough subpackets!"),
+                    Operator::Equal => values.take(2).reduce(|first, second| if first == second {1} else {0}).expect("Not enough subpackets!")
                 }
             }
         }

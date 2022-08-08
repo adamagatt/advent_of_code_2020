@@ -1,6 +1,6 @@
 use crate::utils::read_int_line;
 
-pub fn solution6() -> () {
+pub fn solution6() {
     let fish_timers = read_int_line("src/data/solution6.txt", ',');
     println!("{}", solution6a(&fish_timers));
     println!("{}", solution6b(&fish_timers));

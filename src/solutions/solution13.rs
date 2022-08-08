@@ -16,7 +16,7 @@ struct Fold {
     coordinate: i32
 }
 
-fn solution13a(dots: &HashSet<Dot>, instructions: &Vec<Fold>) -> usize {
+fn solution13a(dots: &HashSet<Dot>, instructions: &[Fold]) -> usize {
     // Only care about the first instruction for part A
     let instruction = &instructions[0];
     
@@ -28,7 +28,7 @@ fn solution13a(dots: &HashSet<Dot>, instructions: &Vec<Fold>) -> usize {
     new_dots.len()
 }
 
-fn solution13b(dots: &HashSet<Dot>, instructions: &Vec<Fold>) -> String {
+fn solution13b(dots: &HashSet<Dot>, instructions: &[Fold]) -> String {
     let new_dots = dots.iter()
         .map(|dot| instructions.iter()
             // Can apply all instructions by folding the entire list of them over
@@ -66,7 +66,7 @@ fn position_after_fold((dot_x, dot_y): &Dot, fold: &Fold) -> Dot {
 fn parse_input(lines: Vec<String>) -> (HashSet<Dot>, Vec<Fold>) {
     // Lines until the first empty line are the dot initial coordinates
     let dots = lines.iter()
-        .take_while(|line| line.len() > 0)
+        .take_while(|line| !line.is_empty())
         .map(|dot_coords| {
             let tokens = dot_coords
                 .split(',')
@@ -78,7 +78,7 @@ fn parse_input(lines: Vec<String>) -> (HashSet<Dot>, Vec<Fold>) {
     // Begin reading after the number of dots until the next empty line
     let folds = lines.iter()
         .skip(dots.len() + 1)
-        .take_while(|line| line.len() > 0)
+        .take_while(|line| !line.is_empty())
         .map(|instruction| {
             let direction = &instruction[11..12];
             let coordinate = &instruction[13..];

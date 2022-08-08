@@ -7,7 +7,7 @@ type ProblemLine = (Vec<Segments>, Vec<Segments>);
 
 const UNIQUE_LENGTHS_FOR_DIGIT: [(usize, usize); 4] = [(1, 2), (4, 4), (7, 3), (8, 7)];
 
-pub fn solution8() -> () {
+pub fn solution8() {
     let code_lines = split_input_output(read_lines_by_words("src/data/solution8.txt"));
     println!("{}", solution8a(code_lines.clone()));
     println!("{}", solution8b(code_lines));
@@ -32,7 +32,7 @@ fn solution8b(mut code_lines: Vec<ProblemLine>) -> i32 {
         .sum()
 }
 
-fn calc_output_values(segment_map: [Option<Segments>; 10], outputs: &Vec<Segments>) -> i32 {
+fn calc_output_values(segment_map: [Option<Segments>; 10], outputs: &[Segments]) -> i32 {
     outputs.iter()
         .map(|output| segment_map.iter().position(|segment_set| segment_set.as_ref().unwrap() == output))
         // Reverse order of found digits so that the increasing enumeration can be used as the

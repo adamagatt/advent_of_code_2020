@@ -35,10 +35,10 @@ fn a_star(map: &Map, larger_map: bool) -> u32 {
     // Nodes we have visited and won't need to consider again
     let mut visited = HashSet::<Node>::new();
     
-    let first_node = Node::new((0, 0), 0 as u32, &goal_coords);
+    let first_node = Node::new((0, 0), 0_u32, &goal_coords);
     insert_node(&mut known, &first_node);
 
-    while known.len() > 0 {
+    while !known.is_empty() {
         let cur_node = known.remove(0);
 
         // Have we met our goal?
@@ -46,7 +46,7 @@ fn a_star(map: &Map, larger_map: bool) -> u32 {
             return cur_node.known_cost;
         }
 
-        for neighbour in get_neighbours(&cur_node, &map, &goal_coords) {
+        for neighbour in get_neighbours(&cur_node, map, &goal_coords) {
             // If this node is not in the closed list (whether just removed or not)
             if !visited.contains(&neighbour) {
                 // Add it to the found list, or revise with a lower cost if possible
@@ -60,7 +60,7 @@ fn a_star(map: &Map, larger_map: bool) -> u32 {
     panic!("Ran out of found nodes!");
 }
 
-fn insert_node(list: &mut Vec<Node>, node: &Node) -> () {
+fn insert_node(list: &mut Vec<Node>, node: &Node) {
     if let Some(found) = get_node(list, node) {
         // If the node is already in the list then lower its cost if necessary
         if node.known_cost < found.known_cost {
@@ -78,7 +78,7 @@ fn insert_node(list: &mut Vec<Node>, node: &Node) -> () {
     list.sort_by_key(|node| node.total_cost);
 }
 
-fn get_node<'a, 'b>(list: &'a mut Vec<Node>, target: &'b Node) -> Option<&'a mut Node> {
+fn get_node<'a, 'b>(list: &'a mut [Node], target: &'b Node) -> Option<&'a mut Node> {
     list.iter_mut()
         .find(|node| node.coords == target.coords)
 }
@@ -123,7 +123,6 @@ fn manhattan(coords_1: &(usize, usize), coords_2: &(usize, usize)) -> u32 {
 struct Node {
     coords: (usize, usize),
     known_cost: u32,
-    guess_remaining: u32,
     total_cost: u32
 }
 
@@ -133,7 +132,6 @@ impl Node {
         Node {
             coords,
             known_cost,
-            guess_remaining,
             total_cost: known_cost + guess_remaining
         }
     }

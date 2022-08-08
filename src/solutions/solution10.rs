@@ -2,7 +2,7 @@ use crate::utils::read_string_lines;
 
 use std::collections::HashMap;
 
-pub fn solution10() -> () {
+pub fn solution10() {
     // Map end brackets to their required start bracket, and score if corrupted
     let end_bracket_match = [
         (')', ('(', 3)),
@@ -16,14 +16,14 @@ pub fn solution10() -> () {
     println!("{}", solution10b(&code_lines, &end_bracket_match));
 }
 
-fn solution10a(code_lines: &Vec<String>, end_bracket_match: &HashMap<char, (char, i32)>) -> i32 {
+fn solution10a(code_lines: &[String], end_bracket_match: &HashMap<char, (char, i32)>) -> i32 {
     code_lines.iter()
         // Return the score of corrupted lists, and filter out those not corrupted
-        .filter_map(|code| score_if_corrupted(code, &end_bracket_match))
+        .filter_map(|code| score_if_corrupted(code, end_bracket_match))
         .sum()
 }
 
-fn score_if_corrupted(code: &String, end_bracket_match: &HashMap<char, (char, i32)>) -> Option<i32> {
+fn score_if_corrupted(code: &str, end_bracket_match: &HashMap<char, (char, i32)>) -> Option<i32> {
     // Bracket matching is a classic stack walking problem
     let mut stack = Vec::<char>::new();
 
@@ -42,10 +42,10 @@ fn score_if_corrupted(code: &String, end_bracket_match: &HashMap<char, (char, i3
         }
     }
 
-    return None;
+    None
 }
 
-fn solution10b(code_lines: &Vec<String>, end_bracket_match: &HashMap<char, (char, i32)>) -> u64 {
+fn solution10b(code_lines: &[String], end_bracket_match: &HashMap<char, (char, i32)>) -> u64 {
     // Scores are 64-bit as the scoring math that occurs involves lots of multiplication, and so
     // the total score is exponential to the length of the incomplete string
     let matching_bracket_scores = [
@@ -67,7 +67,7 @@ fn solution10b(code_lines: &Vec<String>, end_bracket_match: &HashMap<char, (char
     code_scores[code_scores.len() / 2]
 }
 
-fn remainder_for_incomplete_codes(code: &String, end_bracket_match: &HashMap<char, (char, i32)>) -> Option<Vec<char>> {
+fn remainder_for_incomplete_codes(code: &str, end_bracket_match: &HashMap<char, (char, i32)>) -> Option<Vec<char>> {
     // Bracket matching is a classic stack walking problem
     let mut stack = Vec::<char>::new();
 
@@ -88,7 +88,7 @@ fn remainder_for_incomplete_codes(code: &String, end_bracket_match: &HashMap<cha
 
     // At this point our code isn't corrupt but may be complete, in which case we
     // also need to return None so it can be filtered out by the scoring system 
-    if stack.len() == 0 {
+    if stack.is_empty() {
         None
     } else {
         Some(stack)

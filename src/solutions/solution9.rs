@@ -1,6 +1,6 @@
 use crate::utils::read_2d_int_array;
 
-pub fn solution9() -> () {
+pub fn solution9() {
     let floor_heights = read_2d_int_array("src/data/solution9.txt");
     println!("{}", solution9a(&floor_heights));
     println!("{}", solution9b(&floor_heights));
@@ -57,24 +57,24 @@ fn solution9b(floor_heights: &Vec<Vec<u8>>) -> u32 {
     basin_sizes[0] * basin_sizes[1] * basin_sizes[2]
 }
 
-fn basin_size_from_flood_fill(floor_heights: &Vec<Vec<u8>>, visited: &mut Vec<Vec<bool>>, row: usize, col: usize) -> u32 {
+fn basin_size_from_flood_fill(floor_heights: &Vec<Vec<u8>>, visited: &mut [Vec<bool>], row: usize, col: usize) -> u32 {
     // Keep a list of discovered basin locations to continue the flood fill through
     let mut to_visit = vec![(row, col)];
     let mut basin_size = 0;
 
     // Continue until we run out of coordinates to visit
-    while to_visit.len() > 0 {
+    while !to_visit.is_empty() {
         // Retrieve the next coordinate from the list and mark as visited
         let (row, col) = to_visit.remove(0);
         basin_size += 1;
         visited[row][col] = true;
         // Determine valid neighbours to visit and add to list
-        to_visit.append(&mut get_unvisited_neighbours(&floor_heights, &visited, &to_visit, row as i32, col as i32));
+        to_visit.append(&mut get_unvisited_neighbours(floor_heights, visited, &to_visit, row as i32, col as i32));
     }
     basin_size
 }
 
-fn get_unvisited_neighbours(floor_heights: &Vec<Vec<u8>>, visited: &Vec<Vec<bool>>, to_visit: &Vec<(usize, usize)>, row: i32, col: i32) -> Vec<(usize, usize)> {
+fn get_unvisited_neighbours(floor_heights: &Vec<Vec<u8>>, visited: &[Vec<bool>], to_visit: &[(usize, usize)], row: i32, col: i32) -> Vec<(usize, usize)> {
     // Checking all orthogonal neighbours
     [(row-1, col), (row+1, col), (row, col-1), (row, col+1)].iter()
         .filter(|(neighbour_row, neighbour_col)|
@@ -89,5 +89,5 @@ fn get_unvisited_neighbours(floor_heights: &Vec<Vec<u8>>, visited: &Vec<Vec<bool
             && !to_visit.contains(&(*neighbour_row as usize, *neighbour_col as usize))
         )
         .map(|&(row, col)| (row as usize, col as usize))
-        .collect::<Vec<(usize, usize)>>()
+        .collect()
 }

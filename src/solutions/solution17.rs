@@ -47,7 +47,7 @@ fn solution17b(target_area: &TargetArea) -> i32 {
 }
 
 fn probe_ends_within_area(mut probe: Probe, target_area: &TargetArea) -> bool {
-    while !end_simulation(&probe, &target_area) {
+    while !end_simulation(&probe, target_area) {
         update_probe(&mut probe);
         if target_area.contains(&probe) {
             return true;
@@ -78,7 +78,7 @@ fn height_for_initial_y_vel(y_vel: i32) -> i32 {
     (y_vel * (y_vel + 1)) / 2
 }
 
-fn parse_target_area(line_in: &String) -> TargetArea {
+fn parse_target_area(line_in: &str) -> TargetArea {
     let re = Regex::new(r"(-?\d+)").unwrap();
     let target_area = re.find_iter(line_in)
         // Convert each captured number to i32

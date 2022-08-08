@@ -3,7 +3,7 @@ use crate::utils::read_int_line;
 use std::collections::{BTreeMap, HashMap};
 use std::cmp::{min, max};
 
-pub fn solution7() -> () {
+pub fn solution7() {
     let crab_positions = read_int_line("src/data/solution7.txt", ',');
     println!("{}", solution7a(&crab_positions));
     println!("{}", solution7b(&crab_positions));
@@ -91,7 +91,7 @@ fn fuel_need_for_position(tree: &BTreeMap<i32, i32>, position: i32) -> i32 {
 fn fuel_need_for_position_cached(tree: &BTreeMap<i32, i32>, position: i32, cache: &mut HashMap<i32, i32>) -> i32 {
     *(cache
         .entry(position)
-        .or_insert(fuel_need_for_position(tree, position))
+        .or_insert_with(|| fuel_need_for_position(tree, position))
     )
 }
 
