@@ -26,7 +26,8 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
         )
     );
 
-    while combined.0.try_explode(0) || combined.0.try_split() { }
+    // Checks for explodes and splits until none are required
+    while combined.0.try_explode_children(0).exploded || combined.0.try_split_children() { }
 
     combined
 }
@@ -49,30 +50,72 @@ enum Node {
     Value(u32)
 }
 
+struct ExplodeResult {
+    exploded: bool,
+    part: ExplodePart,
+}
+
+enum ExplodePart {
+    None,
+    Left(u32),
+    Right(u32)
+}
+
 impl Pair {
-    fn try_explode(&mut self, outer_pairs: u32) -> bool {
+    fn try_explode_children(&mut self, outer_pairs: u32) -> ExplodeResult {
+        // At outer pair limit, any children that are pairs are ready to explode
         if outer_pairs >= OUTER_PAIR_LIMIT {
+            // Important to check left then right separately, due to slight differences in propagation
+            // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
+            // exploding after each add should not result in a pair reaching the depth limit while having further
+            // pairs beneath them
             if let Node::Pair(pair) = &mut self.left {
-                return true;
+                self.left = Node::Value(0);
+                self.right.accept_explode_part(ExplodePart::Right(pair.right.force_as_value()));
+                return ExplodeResult {
+                    exploded: true,
+                    part: ExplodePart::Left(self.left.force_as_value())
+                };
             } else if let Node::Pair(pair) = &mut self.right {
-                return true;
+                self.right = Node::Value(0);
+                self.left.accept_explode_part(ExplodePart::Left(pair.left.force_as_value()));
+                return ExplodeResult {
+                    exploded: true,
+                    part: ExplodePart::Right(self.right.force_as_value())
+                };
             }
         } else {
-            for child in [&mut self.left, &mut self.right] {
+            // TODO: COMMENT
+            for (child, is_left) in [(&mut self.left, true), (&mut self.right, false)] {
                 if let Node::Pair(pair) = child {
-                    if pair.try_explode(outer_pairs+1) {
-                        return true;
+                    let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
+                    if  explode_attempt.exploded {
+                        if is_left {
+                            if let ExplodePart::Right(value) = explode_attempt.part {
+                                explode_attempt.part = ExplodePart::None;
+                                self.right.accept_explode_part(value);
+                            }
+                        } else {
+                            if let ExplodePart::Left(value) = explode_attempt.part {
+                                explode_attempt.part = ExplodePart::None;
+                                self.left.accept_explode_part(value);
+                            }
+                        }
+                        return explode_attempt;
                     }
                 }
             }
         }
-        false // No explodes required                
+        ExplodeResult{
+            exploded: false,
+            part: ExplodePart::None
+        } // No explodes required                
     }
 
-    fn try_split(&mut self) -> bool{
+    fn try_split_children(&mut self) -> bool{
         for child in [&mut self.left, &mut self.right] {
             if match child {
-                Node::Pair(pair) => pair.try_split(),
+                Node::Pair(pair) => pair.try_split_children(),
                 Node::Value(value) if (*value >= SPLIT_LIMIT) => {
                     child.split();
                     true
@@ -87,15 +130,19 @@ impl Pair {
 }
 
 impl Node {
+    fn force_as_value(&self) -> u32 {
+        if let Self::Value(value) = self {*value} else {unreachable!("Forcing non-value node to value!")}
+    }
+
     fn split(&mut self) {
         match self {
-            Node::Value(value) => {
+            Self::Value(value) => {
                 let left_val = *value / 2;
-                *self = Node::Pair(
+                *self = Self::Pair(
                     Box::new(
                         Pair {
-                            left: Node::Value(left_val),
-                            right: Node::Value(*value - left_val)
+                            left: Self::Value(left_val),
+                            right: Self::Value(*value - left_val)
                         }
                     )
                 );
@@ -104,7 +151,6 @@ impl Node {
             _ => unimplemented!("Only value nodes are splittable!")
         }
     }
-    
 }
 
 trait Magnitude { 
