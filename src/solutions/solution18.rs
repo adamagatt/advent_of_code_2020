@@ -1,7 +1,7 @@
 use crate::utils::read_string_lines;
 
 pub fn solution18 () {
-    let input: Vec<SnailfishNumber> = read_string_lines("src/data/solution18.txt")[3..4].iter()
+    let input: Vec<SnailfishNumber> = read_string_lines("src/data/solution18.txt").iter()
         .map(String::as_str)
         .map(parse_snailfish_number)
         .collect();
@@ -69,40 +69,49 @@ impl Pair {
             // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
             // exploding after each add should not result in a pair reaching the depth limit while having further
             // pairs beneath them
-            if let Node::Pair(pair) = &mut self.left {
-                self.left = Node::Value(0);
+            let old_left = std::mem::replace(&mut self.left, Node::Value(0));
+            if let Node::Pair(pair) = &old_left {
                 self.right.accept_explode_part(ExplodePart::Right(pair.right.force_as_value()));
                 return ExplodeResult {
                     exploded: true,
-                    part: ExplodePart::Left(self.left.force_as_value())
+                    part: ExplodePart::Left(pair.left.force_as_value())
                 };
-            } else if let Node::Pair(pair) = &mut self.right {
-                self.right = Node::Value(0);
+            } else {
+                self.left = old_left;
+            }
+            
+            let old_right = std::mem::replace(&mut self.right, Node::Value(0));
+            if let Node::Pair(pair) = &old_right {
                 self.left.accept_explode_part(ExplodePart::Left(pair.left.force_as_value()));
                 return ExplodeResult {
                     exploded: true,
-                    part: ExplodePart::Right(self.right.force_as_value())
+                    part: ExplodePart::Right(pair.right.force_as_value())
                 };
+            } else {
+                self.right = old_right
             }
         } else {
-            // TODO: COMMENT
-            for (child, is_left) in [(&mut self.left, true), (&mut self.right, false)] {
-                if let Node::Pair(pair) = child {
-                    let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
-                    if  explode_attempt.exploded {
-                        if is_left {
-                            if let ExplodePart::Right(value) = explode_attempt.part {
-                                explode_attempt.part = ExplodePart::None;
-                                self.right.accept_explode_part(value);
-                            }
-                        } else {
-                            if let ExplodePart::Left(value) = explode_attempt.part {
-                                explode_attempt.part = ExplodePart::None;
-                                self.left.accept_explode_part(value);
-                            }
-                        }
-                        return explode_attempt;
+            // Otherwise a recursive search through child pairs. Propagate upwards any reports of
+            // explosions. An explosion may also come with a left- or right- fragment that needs to
+            // be shifted left or right along the tree. In practical terms this involves moving the
+            // fragment up the tree and then down again.
+            if let Node::Pair(pair) = &mut self.left {
+                let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
+                if  explode_attempt.exploded {
+                    if let ExplodePart::Right(_) = explode_attempt.part {
+                        self.right.accept_explode_part(explode_attempt.part);
+                        explode_attempt.part = ExplodePart::None;
                     }
+                    return explode_attempt;
+                }
+            } else if let Node::Pair(pair) = &mut self.right {
+                let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
+                if  explode_attempt.exploded {
+                    if let ExplodePart::Left(_) = explode_attempt.part {
+                        self.left.accept_explode_part(explode_attempt.part);
+                        explode_attempt.part = ExplodePart::None;
+                    }
+                    return explode_attempt;
                 }
             }
         }
@@ -150,6 +159,24 @@ impl Node {
             },
             _ => unimplemented!("Only value nodes are splittable!")
         }
+    }
+
+    fn accept_explode_part(&mut self, part: ExplodePart) {
+        match part {
+            ExplodePart::Left(part_value) => {
+                match self {
+                  Node::Value(my_value) => {*my_value += part_value;},
+                  Node::Pair(pair) => pair.left.accept_explode_part(part)
+                };
+            },
+            ExplodePart::Right(part_value) => {
+                match self {
+                    Node::Value(my_value) => {*my_value += part_value;},
+                    Node::Pair(pair) => pair.right.accept_explode_part(part)
+                };
+            },
+            _ => ()            
+        };
     }
 }
 
