@@ -17,7 +17,7 @@ fn solution18a(input: &[SnailfishNumber]) -> i32 {
 }
 
 fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber {
-    let combined = SnailfishNumber(
+    let mut combined = SnailfishNumber(
         Box::new(
             Pair {
                 left: Node::Pair(left.0),
@@ -26,17 +26,21 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
         )
     );
 
+    loop {
+        if combined.0.try_split() {
+            continue;
+        }
+
+        break;
+    }
+
     combined
 }
 
+const SPLIT_LIMIT: i32 = 10;
+
 #[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
-
-impl Magnitude for SnailfishNumber {
-    fn magnitude(&self) -> i32 {
-        self.0.magnitude()
-    }
-}
 
 #[derive(Clone)]
 struct Pair {
@@ -50,22 +54,61 @@ enum Node {
     Value(i32)
 }
 
+impl Pair {
+    fn try_split(&mut self) -> bool{
+        for child in [&mut self.left, &mut self.right] {
+            if match child {
+                Node::Pair(pair) => pair.try_split(),
+                Node::Value(value) if (*value >= SPLIT_LIMIT) => {
+                    child.split();
+                    true
+                },
+                _ => false
+            } {
+                return true;
+            }
+        }
+        false // No splits required
+    }
+}
+
+impl Node {
+    fn split(&mut self) {
+        match self {
+            Node::Value(value) => {
+                let left_val = *value / 2;
+                *self = Node::Pair(
+                    Box::new(
+                        Pair {
+                            left: Node::Value(left_val),
+                            right: Node::Value(*value - left_val)
+                        }
+                    )
+                );
+
+            },
+            _ => unimplemented!("Only value nodes are splittable!")
+        }
+    }
+    
+}
+
 trait Magnitude { 
     fn magnitude(&self) -> i32;
+}
+
+impl Magnitude for SnailfishNumber {
+    fn magnitude(&self) -> i32 {
+        self.0.magnitude()
+    }
 }
 
 impl Magnitude for Node {
     fn magnitude(&self) -> i32 {
         match self {
             Node::Pair(pair) => pair.magnitude(), 
-            Node::Value(value) => value.magnitude()
+            Node::Value(value) => *value
         }
-    }
-}
-
-impl Magnitude for i32 {
-    fn magnitude(&self) -> i32 {
-        *self
     }
 }
 
@@ -108,7 +151,7 @@ fn find_comma(pair_ser: &str) -> usize {
             ',' if stack_count == 0 => return idx,
             '[' => stack_count += 1,
             ']' if stack_count == 0 => panic!("Unexpected pair finish!"),
-            ']' => stack_count -=1,
+            ']' => stack_count -= 1,
             _ => ()
         }
     }
