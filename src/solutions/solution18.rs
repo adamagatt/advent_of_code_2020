@@ -1,28 +1,78 @@
 use crate::utils::read_string_lines;
 
 pub fn solution18 () {
-
-    let input: Vec<SnailfishNumber> = read_string_lines("src/data/solution18.txt").iter()
+    let input: Vec<SnailfishNumber> = read_string_lines("src/data/solution18.txt")[3..4].iter()
         .map(String::as_str)
         .map(parse_snailfish_number)
         .collect();
     println!("{}", solution18a(&input));
 }
 
+fn solution18a(input: &[SnailfishNumber]) -> i32 {
+    input.iter()
+    .cloned()
+    .reduce(add_numbers)
+    .expect("Input data is empty of valid Snailfish numbers")
+    .magnitude()
+}
+
+fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber {
+    let combined = SnailfishNumber(
+        Box::new(
+            Pair {
+                left: Node::Pair(left.0),
+                right: Node::Pair(right.0)
+            }
+        )
+    );
+
+    combined
+}
+
+#[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
 
+impl Magnitude for SnailfishNumber {
+    fn magnitude(&self) -> i32 {
+        self.0.magnitude()
+    }
+}
+
+#[derive(Clone)]
 struct Pair {
     left: Node,
     right: Node,
 }
 
+#[derive(Clone)]
 enum Node {
     Pair(Box<Pair>),
     Value(i32)
 }
 
-fn solution18a(input: &[SnailfishNumber]) -> i32 {
-    5
+trait Magnitude { 
+    fn magnitude(&self) -> i32;
+}
+
+impl Magnitude for Node {
+    fn magnitude(&self) -> i32 {
+        match self {
+            Node::Pair(pair) => pair.magnitude(), 
+            Node::Value(value) => value.magnitude()
+        }
+    }
+}
+
+impl Magnitude for i32 {
+    fn magnitude(&self) -> i32 {
+        *self
+    }
+}
+
+impl Magnitude for Pair {
+    fn magnitude(&self) -> i32 {
+        self.left.magnitude() * 3 + self.right.magnitude() * 2
+    }
 }
 
 fn parse_snailfish_number(num_ser: &str) -> SnailfishNumber {
@@ -52,5 +102,15 @@ fn parse_pair(pair_ser: &str) -> Pair {
 }
 
 fn find_comma(pair_ser: &str) -> usize {
-    5
+    let mut stack_count = 0;
+    for (idx, char) in pair_ser.chars().enumerate() {
+        match char {
+            ',' if stack_count == 0 => return idx,
+            '[' => stack_count += 1,
+            ']' if stack_count == 0 => panic!("Unexpected pair finish!"),
+            ']' => stack_count -=1,
+            _ => ()
+        }
+    }
+    unreachable!("Failed to find comma in pair!");
 }
