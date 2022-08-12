@@ -26,18 +26,13 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
         )
     );
 
-    loop {
-        if combined.0.try_split() {
-            continue;
-        }
-
-        break;
-    }
+    while combined.0.try_explode(0) || combined.0.try_split() { }
 
     combined
 }
 
 const SPLIT_LIMIT: i32 = 10;
+const OUTER_PAIR_LIMIT: i32 = 4;
 
 #[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
@@ -55,6 +50,25 @@ enum Node {
 }
 
 impl Pair {
+    fn try_explode(&mut self, outer_pairs: i32) -> bool {
+        if outer_pairs >= OUTER_PAIR_LIMIT {
+            if let Node::Pair(pair) = &mut self.left {
+                return true;
+            } else if let Node::Pair(pair) = &mut self.right {
+                return true;
+            }
+        } else {
+            for child in [&mut self.left, &mut self.right] {
+                if let Node::Pair(pair) = child {
+                    if pair.try_explode(outer_pairs+1) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false // No explodes required                
+    }
+
     fn try_split(&mut self) -> bool{
         for child in [&mut self.left, &mut self.right] {
             if match child {
