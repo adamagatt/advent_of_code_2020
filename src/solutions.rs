@@ -38,7 +38,7 @@ pub fn run(choice: i32) {
         15 => solution15::solution15(),
         16 => solution16::solution16(),
         17 => solution17::solution17(),
-        17 => solution18::solution18(),
+        18 => solution18::solution18(),
         _ => ()
     }
 }
