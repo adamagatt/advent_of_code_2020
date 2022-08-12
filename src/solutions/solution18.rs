@@ -8,7 +8,7 @@ pub fn solution18 () {
     println!("{}", solution18a(&input));
 }
 
-fn solution18a(input: &[SnailfishNumber]) -> i32 {
+fn solution18a(input: &[SnailfishNumber]) -> u32 {
     input.iter()
     .cloned()
     .reduce(add_numbers)
@@ -31,8 +31,8 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
     combined
 }
 
-const SPLIT_LIMIT: i32 = 10;
-const OUTER_PAIR_LIMIT: i32 = 4;
+const SPLIT_LIMIT: u32 = 10;
+const OUTER_PAIR_LIMIT: u32 = 4;
 
 #[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
@@ -46,11 +46,11 @@ struct Pair {
 #[derive(Clone)]
 enum Node {
     Pair(Box<Pair>),
-    Value(i32)
+    Value(u32)
 }
 
 impl Pair {
-    fn try_explode(&mut self, outer_pairs: i32) -> bool {
+    fn try_explode(&mut self, outer_pairs: u32) -> bool {
         if outer_pairs >= OUTER_PAIR_LIMIT {
             if let Node::Pair(pair) = &mut self.left {
                 return true;
@@ -108,17 +108,17 @@ impl Node {
 }
 
 trait Magnitude { 
-    fn magnitude(&self) -> i32;
+    fn magnitude(&self) -> u32;
 }
 
 impl Magnitude for SnailfishNumber {
-    fn magnitude(&self) -> i32 {
+    fn magnitude(&self) -> u32 {
         self.0.magnitude()
     }
 }
 
 impl Magnitude for Node {
-    fn magnitude(&self) -> i32 {
+    fn magnitude(&self) -> u32 {
         match self {
             Node::Pair(pair) => pair.magnitude(), 
             Node::Value(value) => *value
@@ -127,7 +127,7 @@ impl Magnitude for Node {
 }
 
 impl Magnitude for Pair {
-    fn magnitude(&self) -> i32 {
+    fn magnitude(&self) -> u32 {
         self.left.magnitude() * 3 + self.right.magnitude() * 2
     }
 }
@@ -142,7 +142,7 @@ fn parse_snailfish_number(num_ser: &str) -> SnailfishNumber {
 
 fn parse_node(node_ser: &str) -> Node {
     if !node_ser.starts_with('[') {
-        Node::Value(node_ser.parse::<i32>().expect("Invalid Snailfish number"))
+        Node::Value(node_ser.parse::<u32>().expect("Invalid Snailfish number"))
     } else {
         Node::Pair(
             Box::new(parse_pair(&node_ser[1..node_ser.len()-1]))
