@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::utils::read_string_lines;
 
 pub fn solution18 () {
@@ -27,7 +29,7 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
     );
 
     // Checks for explodes and splits until none are required
-    while combined.0.try_explode_children(0).exploded || combined.0.try_split_children() { }
+    while combined.0.try_explode_children(1).exploded || combined.0.try_split_children() { }
 
     combined
 }
@@ -38,16 +40,37 @@ const OUTER_PAIR_LIMIT: u32 = 4;
 #[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
 
+impl fmt::Debug for SnailfishNumber {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Number {:?}", self.0)
+    }
+}
+
 #[derive(Clone)]
 struct Pair {
     left: Node,
     right: Node,
 }
 
+impl fmt::Debug for Pair {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{:?} , {:?}]", self.left, self.right)
+    }
+}
+
 #[derive(Clone)]
 enum Node {
     Pair(Box<Pair>),
     Value(u32)
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Node::Value(value) => write!(f, "{}", value),
+            Node::Pair(pair) => pair.fmt(f)
+        }
+    }
 }
 
 struct ExplodeResult {
@@ -71,6 +94,7 @@ impl Pair {
             // pairs beneath them
             let old_left = std::mem::replace(&mut self.left, Node::Value(0));
             if let Node::Pair(pair) = &old_left {
+                println!("EXPLODED");
                 self.right.accept_explode_part(ExplodePart::Right(pair.right.force_as_value()));
                 return ExplodeResult {
                     exploded: true,
@@ -104,7 +128,8 @@ impl Pair {
                     }
                     return explode_attempt;
                 }
-            } else if let Node::Pair(pair) = &mut self.right {
+            }
+            if let Node::Pair(pair) = &mut self.right {
                 let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
                 if  explode_attempt.exploded {
                     if let ExplodePart::Left(_) = explode_attempt.part {
@@ -140,7 +165,7 @@ impl Pair {
 
 impl Node {
     fn force_as_value(&self) -> u32 {
-        if let Self::Value(value) = self {*value} else {unreachable!("Forcing non-value node to value!")}
+        if let Self::Value(value) = self {*value} else { dbg!(&self); unreachable!("Forcing non-value node to value!")}
     }
 
     fn split(&mut self) {
@@ -166,13 +191,13 @@ impl Node {
             ExplodePart::Left(part_value) => {
                 match self {
                   Node::Value(my_value) => {*my_value += part_value;},
-                  Node::Pair(pair) => pair.left.accept_explode_part(part)
+                  Node::Pair(pair) => pair.right.accept_explode_part(part)
                 };
             },
             ExplodePart::Right(part_value) => {
                 match self {
                     Node::Value(my_value) => {*my_value += part_value;},
-                    Node::Pair(pair) => pair.right.accept_explode_part(part)
+                    Node::Pair(pair) => pair.left.accept_explode_part(part)
                 };
             },
             _ => ()            
