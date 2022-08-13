@@ -8,14 +8,25 @@ pub fn solution18 () {
         .map(parse_snailfish_number)
         .collect();
     println!("{}", solution18a(&input));
+    println!("{}", solution18b(&input));
 }
 
 fn solution18a(input: &[SnailfishNumber]) -> u32 {
     input.iter()
-    .cloned()
-    .reduce(add_numbers)
-    .expect("Input data is empty of valid Snailfish numbers")
-    .magnitude()
+        .cloned()
+        .reduce(add_numbers)
+        .expect("Input data is empty of valid Snailfish numbers")
+        .magnitude()
+}
+
+fn solution18b(input: &[SnailfishNumber]) -> u32 {
+    input.iter()
+        .flat_map(|left| input.iter()
+            .map(move |right| (left.clone(), right.clone()))
+        )
+        .map(|(left, right)| add_numbers(left, right).magnitude())
+        .max()
+        .expect("Input data is empty of valid Snailfish numbers")
 }
 
 fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber {
@@ -94,7 +105,6 @@ impl Pair {
             // pairs beneath them
             let old_left = std::mem::replace(&mut self.left, Node::Value(0));
             if let Node::Pair(pair) = &old_left {
-                println!("EXPLODED");
                 self.right.accept_explode_part(ExplodePart::Right(pair.right.force_as_value()));
                 return ExplodeResult {
                     exploded: true,
