@@ -121,78 +121,84 @@ struct ExplodeResult {
 }
 
 struct ExplodeCarryValue {
-    direction: Direction,
+    pair_half: PairHalf,
     value: u32
 }
 
 #[derive(PartialEq)]
-enum Direction {Left, Right}
+enum PairHalf {Left, Right}
 
 impl Pair {
+    fn create_carry_values(&self, split_half: PairHalf) -> (ExplodeCarryValue, ExplodeCarryValue) {
+        let left_carry_value = ExplodeCarryValue{
+            pair_half: PairHalf::Left,
+            value: self.left.force_as_value()
+        };
+        let right_carry_value = ExplodeCarryValue{
+            pair_half: PairHalf::Right,
+            value: self.right.force_as_value()
+        };
+
+        if split_half == PairHalf::Left {
+            (left_carry_value, right_carry_value)
+        } else {
+            (right_carry_value, left_carry_value)
+        }
+    }
+
     fn try_explode_children(&mut self, outer_pairs: u32) -> ExplodeResult {
         // At outer pair limit, any children that are pairs are ready to explode
+        // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
+        // exploding after each add should not result in a pair reaching the depth limit while having further
+        // pairs beneath them
         if outer_pairs >= OUTER_PAIR_LIMIT {
-            // Important to check left then right separately, due to slight differences in propagation
-            // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
-            // exploding after each add should not result in a pair reaching the depth limit while having further
-            // pairs beneath them
-            let old_left = std::mem::replace(&mut self.left, Node::Value(0));
-            if let Node::Pair(pair) = &old_left {
-                self.right.accept_carry_value(&ExplodeCarryValue{
-                    direction: Direction::Right,
-                    value: pair.right.force_as_value()
-                });
-                return ExplodeResult {
-                    exploded: true,
-                    carry_value: Some(ExplodeCarryValue{
-                        direction: Direction::Left,
-                        value: pair.left.force_as_value()
-                    })
+            // Check left before right
+            for check_half in vec!(PairHalf::Left, PairHalf::Right) {
+                let (child, other_child) = if check_half == PairHalf::Left {
+                    (&mut self.left, &mut self.right)
+                } else {
+                    (&mut self.right, &mut self.left)
                 };
-            } else {
-                self.left = old_left;
+
+                if let Node::Pair(pair) = child {
+                    // The exploded child is broken into two carried values and is set to zero
+                    let (propagate_carry, other_child_accepts) = pair.create_carry_values(check_half);
+                    *child = Node::Value(0);
+                    // One of the split values is accepted by the other child
+                    other_child.accept_carry_value(&other_child_accepts);
+                    // The other split value must propagate up the tree and then down again
+                    return ExplodeResult {
+                        exploded: true,
+                        carry_value: Some(propagate_carry)
+                    };
+                }
             }
             
-            let old_right = std::mem::replace(&mut self.right, Node::Value(0));
-            if let Node::Pair(pair) = &old_right {
-                self.left.accept_carry_value(&ExplodeCarryValue{
-                    direction: Direction::Left,
-                    value: pair.left.force_as_value()
-                });
-                return ExplodeResult {
-                    exploded: true,
-                    carry_value: Some(ExplodeCarryValue{
-                        direction: Direction::Right,
-                        value: pair.right.force_as_value()
-                    })
-                };
-            } else {
-                self.right = old_right
-            }
         } else {
             // Otherwise a recursive search through child pairs. Propagate upwards any reports of
             // explosions. An explosion may also come with a left- or right- fragment that needs to
             // be shifted left or right along the tree. In practical terms this involves moving the
             // fragment up the tree and then down again.
-            if let Node::Pair(pair) = &mut self.left {
-                let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
-                if explode_attempt.exploded {
-                    if let Some(ExplodeCarryValue{direction: Direction::Right, ..}) = &explode_attempt.carry_value {
-                        // Safe to unwrap as we already matched against Some above
-                        self.right.accept_carry_value(&explode_attempt.carry_value.unwrap());
-                        explode_attempt.carry_value = None;
+            // Check left before right
+            for check_half in vec!(PairHalf::Left, PairHalf::Right) {
+                let (child, other_child) = if check_half == PairHalf::Left {
+                    (&mut self.left, &mut self.right)
+                } else {
+                    (&mut self.right, &mut self.left)
+                };
+            
+                if let Node::Pair(pair) = child {
+                    let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
+                    if explode_attempt.exploded {
+                        if let Some(carry_value) = &explode_attempt.carry_value {
+                            if carry_value.pair_half != check_half {
+                                // Safe to unwrap as we already matched against Some above
+                                other_child.accept_carry_value(&explode_attempt.carry_value.unwrap());
+                                explode_attempt.carry_value = None;
+                            }
+                        }
+                        return explode_attempt;
                     }
-                    return explode_attempt;
-                }
-            }
-            if let Node::Pair(pair) = &mut self.right {
-                let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
-                if explode_attempt.exploded {
-                    if let Some(ExplodeCarryValue{direction: Direction::Left, ..}) = &explode_attempt.carry_value {
-                        self.left.accept_carry_value(&explode_attempt.carry_value.unwrap());
-                        explode_attempt.carry_value = None;
-                    }
-                    return explode_attempt;
                 }
             }
         }
@@ -248,10 +254,10 @@ impl Node {
             (Node::Value(my_value), ExplodeCarryValue{value: carried, ..}) => {
                 *my_value += carried;
             },
-            (Node::Pair(pair), ExplodeCarryValue{direction: Direction::Right, ..}) => {
+            (Node::Pair(pair), ExplodeCarryValue{pair_half: PairHalf::Right, ..}) => {
                 pair.left.accept_carry_value(carry_value)
             },
-            (Node::Pair(pair), ExplodeCarryValue{direction: Direction::Left, ..}) => {
+            (Node::Pair(pair), ExplodeCarryValue{pair_half: PairHalf::Left, ..}) => {
                 pair.right.accept_carry_value(carry_value)
             }           
         };
