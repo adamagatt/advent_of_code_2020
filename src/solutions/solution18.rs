@@ -147,20 +147,21 @@ impl Pair {
     }
 
     fn try_explode_children(&mut self, outer_pairs: u32) -> ExplodeResult {
-        // At outer pair limit, any children that are pairs are ready to explode
-        // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
-        // exploding after each add should not result in a pair reaching the depth limit while having further
-        // pairs beneath them
-        if outer_pairs >= OUTER_PAIR_LIMIT {
-            // Check left before right
-            for check_half in vec!(PairHalf::Left, PairHalf::Right) {
-                let (child, other_child) = if check_half == PairHalf::Left {
-                    (&mut self.left, &mut self.right)
-                } else {
-                    (&mut self.right, &mut self.left)
-                };
+        // Check left child before right
+        for check_half in vec!(PairHalf::Left, PairHalf::Right) {
+            let (child, other_child) = if check_half == PairHalf::Left {
+                (&mut self.left, &mut self.right)
+            } else {
+                (&mut self.right, &mut self.left)
+            };
 
-                if let Node::Pair(pair) = child {
+            // Only children that are pairs are in danger of exploding (directly or recursively)
+            // NOTE: There is an assumption that an exploding pair will have values as both children, as regular
+            // exploding after each add should not result in a pair reaching the depth limit while having further
+            // pairs beneath them
+            if let Node::Pair(pair) = child {
+                // Explode at outer pair limit
+                if outer_pairs >= OUTER_PAIR_LIMIT {
                     // The exploded child is broken into two carried values and is set to zero
                     let (propagate_carry, other_child_accepts) = pair.create_carry_values(check_half);
                     *child = Node::Value(0);
@@ -171,29 +172,18 @@ impl Pair {
                         exploded: true,
                         carry_value: Some(propagate_carry)
                     };
-                }
-            }
-            
-        } else {
-            // Otherwise a recursive search through child pairs. Propagate upwards any reports of
-            // explosions. An explosion may also come with a left- or right- fragment that needs to
-            // be shifted left or right along the tree. In practical terms this involves moving the
-            // fragment up the tree and then down again.
-            // Check left before right
-            for check_half in vec!(PairHalf::Left, PairHalf::Right) {
-                let (child, other_child) = if check_half == PairHalf::Left {
-                    (&mut self.left, &mut self.right)
                 } else {
-                    (&mut self.right, &mut self.left)
-                };
-            
-                if let Node::Pair(pair) = child {
+                    // A recursive search if any children explode. Propagate upwards any reports of
+                    // explosions. An explosion may also come with a left- or right- fragment that needs to
+                    // be shifted left or right along the tree. In practical terms this involves moving the
+                    // fragment up the tree and then down again.
                     let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
                     if explode_attempt.exploded {
                         if let Some(carry_value) = &explode_attempt.carry_value {
+                            // See if the other child is in the right direction to accept the propagated
+                            // value from the explosion
                             if carry_value.pair_half != check_half {
-                                // Safe to unwrap as we already matched against Some above
-                                other_child.accept_carry_value(&explode_attempt.carry_value.unwrap());
+                                other_child.accept_carry_value(carry_value);
                                 explode_attempt.carry_value = None;
                             }
                         }
@@ -202,7 +192,7 @@ impl Pair {
                 }
             }
         }
-        // If reached, no explodes are required
+        // If no early returns then no explodes are required
         ExplodeResult{
             exploded: false,
             carry_value: None
