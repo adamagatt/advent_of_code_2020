@@ -36,17 +36,15 @@ fn solution18b(input: &[SnailfishNumber]) -> u32 {
 }
 
 fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber {
-    let mut combined = SnailfishNumber(
-        Box::new(
-            Pair {
-                left: Node::Pair(left.0),
-                right: Node::Pair(right.0)
-            }
-        )
+    let mut combined = Box::new(
+        Pair {
+            left: Node::Pair(left),
+            right: Node::Pair(right)
+        }
     );
 
     // Check for explodes and splits until none are required
-    while combined.0.try_explode_children(1).exploded || combined.0.try_split_children() { }
+    while combined.try_explode_children(1).exploded || combined.try_split_children() { }
 
     combined
 }
@@ -58,18 +56,11 @@ trait Magnitude {
     fn magnitude(&self) -> u32;
 }
 
-#[derive(Clone)]
-struct SnailfishNumber(Box<Pair>);
-
-impl fmt::Debug for SnailfishNumber {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Number {:?}", self.0)
-    }
-}
+type SnailfishNumber = Box<Pair>;
 
 impl Magnitude for SnailfishNumber {
     fn magnitude(&self) -> u32 {
-        self.0.magnitude()
+        self.as_ref().magnitude()
     }
 }
 
@@ -255,11 +246,9 @@ impl Node {
 }
 
 fn parse_snailfish_number(num_ser: &str) -> SnailfishNumber {
-    SnailfishNumber(
-        Box::new(
-            parse_pair(&num_ser[1..num_ser.len()-1])
-        )
-    )    
+    Box::new(
+        parse_pair(&num_ser[1..num_ser.len()-1])
+    )
 }
 
 fn parse_node(node_ser: &str) -> Node {
