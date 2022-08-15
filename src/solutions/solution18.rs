@@ -1,4 +1,5 @@
-use std::fmt;
+use std::{fmt, ptr::eq};
+use itertools::iproduct;
 
 use crate::utils::read_string_lines;
 
@@ -12,6 +13,7 @@ pub fn solution18 () {
 }
 
 fn solution18a(input: &[SnailfishNumber]) -> u32 {
+    // Just add all of the Snailfish numbers together and determine magnitude
     input.iter()
         .cloned()
         .reduce(add_numbers)
@@ -20,11 +22,15 @@ fn solution18a(input: &[SnailfishNumber]) -> u32 {
 }
 
 fn solution18b(input: &[SnailfishNumber]) -> u32 {
-    input.iter()
-        .flat_map(|left| input.iter()
-            .map(move |right| (left.clone(), right.clone()))
+    // Cartesian product to find each pair of numbers
+    iproduct!(input, input)
+        // Numbers must be different from each other
+        .filter(|(left, right)| !eq(*left, *right))    
+        // Find magnitude of their sum
+        .map(|(left, right)|
+            add_numbers(left.clone(), right.clone()).magnitude()
         )
-        .map(|(left, right)| add_numbers(left, right).magnitude())
+        // We are interested in only the biggest result
         .max()
         .expect("Input data is empty of valid Snailfish numbers")
 }
@@ -39,7 +45,7 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
         )
     );
 
-    // Checks for explodes and splits until none are required
+    // Check for explodes and splits until none are required
     while combined.0.try_explode_children(1).exploded || combined.0.try_split_children() { }
 
     combined
@@ -48,12 +54,22 @@ fn add_numbers(left: SnailfishNumber, right: SnailfishNumber) -> SnailfishNumber
 const SPLIT_LIMIT: u32 = 10;
 const OUTER_PAIR_LIMIT: u32 = 4;
 
+trait Magnitude { 
+    fn magnitude(&self) -> u32;
+}
+
 #[derive(Clone)]
 struct SnailfishNumber(Box<Pair>);
 
 impl fmt::Debug for SnailfishNumber {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Number {:?}", self.0)
+    }
+}
+
+impl Magnitude for SnailfishNumber {
+    fn magnitude(&self) -> u32 {
+        self.0.magnitude()
     }
 }
 
@@ -66,6 +82,12 @@ struct Pair {
 impl fmt::Debug for Pair {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{:?} , {:?}]", self.left, self.right)
+    }
+}
+
+impl Magnitude for Pair {
+    fn magnitude(&self) -> u32 {
+        self.left.magnitude() * 3 + self.right.magnitude() * 2
     }
 }
 
@@ -84,16 +106,27 @@ impl fmt::Debug for Node {
     }
 }
 
-struct ExplodeResult {
-    exploded: bool,
-    part: ExplodePart,
+impl Magnitude for Node {
+    fn magnitude(&self) -> u32 {
+        match self {
+            Node::Pair(pair) => pair.magnitude(), 
+            Node::Value(value) => *value
+        }
+    }
 }
 
-enum ExplodePart {
-    None,
-    Left(u32),
-    Right(u32)
+struct ExplodeResult {
+    exploded: bool,
+    carry_value: Option<ExplodeCarryValue>,
 }
+
+struct ExplodeCarryValue {
+    direction: Direction,
+    value: u32
+}
+
+#[derive(PartialEq)]
+enum Direction {Left, Right}
 
 impl Pair {
     fn try_explode_children(&mut self, outer_pairs: u32) -> ExplodeResult {
@@ -105,10 +138,16 @@ impl Pair {
             // pairs beneath them
             let old_left = std::mem::replace(&mut self.left, Node::Value(0));
             if let Node::Pair(pair) = &old_left {
-                self.right.accept_explode_part(ExplodePart::Right(pair.right.force_as_value()));
+                self.right.accept_carry_value(&ExplodeCarryValue{
+                    direction: Direction::Right,
+                    value: pair.right.force_as_value()
+                });
                 return ExplodeResult {
                     exploded: true,
-                    part: ExplodePart::Left(pair.left.force_as_value())
+                    carry_value: Some(ExplodeCarryValue{
+                        direction: Direction::Left,
+                        value: pair.left.force_as_value()
+                    })
                 };
             } else {
                 self.left = old_left;
@@ -116,10 +155,16 @@ impl Pair {
             
             let old_right = std::mem::replace(&mut self.right, Node::Value(0));
             if let Node::Pair(pair) = &old_right {
-                self.left.accept_explode_part(ExplodePart::Left(pair.left.force_as_value()));
+                self.left.accept_carry_value(&ExplodeCarryValue{
+                    direction: Direction::Left,
+                    value: pair.left.force_as_value()
+                });
                 return ExplodeResult {
                     exploded: true,
-                    part: ExplodePart::Right(pair.right.force_as_value())
+                    carry_value: Some(ExplodeCarryValue{
+                        direction: Direction::Right,
+                        value: pair.right.force_as_value()
+                    })
                 };
             } else {
                 self.right = old_right
@@ -131,32 +176,34 @@ impl Pair {
             // fragment up the tree and then down again.
             if let Node::Pair(pair) = &mut self.left {
                 let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
-                if  explode_attempt.exploded {
-                    if let ExplodePart::Right(_) = explode_attempt.part {
-                        self.right.accept_explode_part(explode_attempt.part);
-                        explode_attempt.part = ExplodePart::None;
+                if explode_attempt.exploded {
+                    if let Some(ExplodeCarryValue{direction: Direction::Right, ..}) = &explode_attempt.carry_value {
+                        // Safe to unwrap as we already matched against Some above
+                        self.right.accept_carry_value(&explode_attempt.carry_value.unwrap());
+                        explode_attempt.carry_value = None;
                     }
                     return explode_attempt;
                 }
             }
             if let Node::Pair(pair) = &mut self.right {
                 let mut explode_attempt = pair.try_explode_children(outer_pairs+1);
-                if  explode_attempt.exploded {
-                    if let ExplodePart::Left(_) = explode_attempt.part {
-                        self.left.accept_explode_part(explode_attempt.part);
-                        explode_attempt.part = ExplodePart::None;
+                if explode_attempt.exploded {
+                    if let Some(ExplodeCarryValue{direction: Direction::Left, ..}) = &explode_attempt.carry_value {
+                        self.left.accept_carry_value(&explode_attempt.carry_value.unwrap());
+                        explode_attempt.carry_value = None;
                     }
                     return explode_attempt;
                 }
             }
         }
+        // If reached, no explodes are required
         ExplodeResult{
             exploded: false,
-            part: ExplodePart::None
-        } // No explodes required                
+            carry_value: None
+        }                
     }
 
-    fn try_split_children(&mut self) -> bool{
+    fn try_split_children(&mut self) -> bool {
         for child in [&mut self.left, &mut self.right] {
             if match child {
                 Node::Pair(pair) => pair.try_split_children(),
@@ -181,7 +228,7 @@ impl Node {
     fn split(&mut self) {
         match self {
             Self::Value(value) => {
-                let left_val = *value / 2;
+                let left_val = *value / 2; // Left half rounds down (integer division)
                 *self = Self::Pair(
                     Box::new(
                         Pair {
@@ -196,47 +243,18 @@ impl Node {
         }
     }
 
-    fn accept_explode_part(&mut self, part: ExplodePart) {
-        match part {
-            ExplodePart::Left(part_value) => {
-                match self {
-                  Node::Value(my_value) => {*my_value += part_value;},
-                  Node::Pair(pair) => pair.right.accept_explode_part(part)
-                };
+    fn accept_carry_value(&mut self, carry_value: &ExplodeCarryValue) {
+        match (self, carry_value) {
+            (Node::Value(my_value), ExplodeCarryValue{value: carried, ..}) => {
+                *my_value += carried;
             },
-            ExplodePart::Right(part_value) => {
-                match self {
-                    Node::Value(my_value) => {*my_value += part_value;},
-                    Node::Pair(pair) => pair.left.accept_explode_part(part)
-                };
+            (Node::Pair(pair), ExplodeCarryValue{direction: Direction::Right, ..}) => {
+                pair.left.accept_carry_value(carry_value)
             },
-            _ => ()            
+            (Node::Pair(pair), ExplodeCarryValue{direction: Direction::Left, ..}) => {
+                pair.right.accept_carry_value(carry_value)
+            }           
         };
-    }
-}
-
-trait Magnitude { 
-    fn magnitude(&self) -> u32;
-}
-
-impl Magnitude for SnailfishNumber {
-    fn magnitude(&self) -> u32 {
-        self.0.magnitude()
-    }
-}
-
-impl Magnitude for Node {
-    fn magnitude(&self) -> u32 {
-        match self {
-            Node::Pair(pair) => pair.magnitude(), 
-            Node::Value(value) => *value
-        }
-    }
-}
-
-impl Magnitude for Pair {
-    fn magnitude(&self) -> u32 {
-        self.left.magnitude() * 3 + self.right.magnitude() * 2
     }
 }
 
