@@ -2,11 +2,12 @@ use crate::utils::read_string_lines;
 use itertools::iproduct;
 use regex::Regex;
 
-use std::{ops::RangeInclusive, cmp::{max, min}};
+use std::{ops::RangeInclusive, cmp::{max, min}, collections::HashSet};
 
 pub fn solution22 () {
     let commands = parse_commands(&read_string_lines("src/data/solution22.txt"));
     println!("{}", solution22a(&commands));
+    println!("{}", solution22b(&commands));
 }
 
 fn solution22a(commands: &[Command]) -> usize {
@@ -23,13 +24,35 @@ fn solution22a(commands: &[Command]) -> usize {
         ).for_each(|(x, y, z)| {
             region[add_offset(x)][add_offset(y)][add_offset(z)] = assign_value;
         });
-});
+    });
 
     region.iter()
         .flat_map(|x| x.iter())
         .flat_map(|x| x.iter())
         .filter(|&square| *square)
         .count()
+}
+
+fn solution22b(commands: &[Command]) -> usize {    
+    let mut coords_on = HashSet::new();
+
+    commands.iter().enumerate().for_each(|(idx, command)| {
+        dbg!(idx);
+
+        iproduct!(
+            command.x_range.clone(),
+            command.y_range.clone(),
+            command.z_range.clone()
+        ).for_each(|(x, y, z)| {
+            if command.instruction == Instruction::On {
+                coords_on.insert((x, y, z));
+            } else {
+                coords_on.remove(&(x, y, z));
+            }
+        });
+    });
+
+    coords_on.len()
 }
 
 #[derive(Debug)]
