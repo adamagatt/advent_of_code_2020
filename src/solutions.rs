@@ -16,8 +16,9 @@ mod solution15;
 mod solution16;
 mod solution17;
 mod solution18;
+mod solution22;
 
-pub const MAX_SOLUTION: i32 = 18;
+pub const MAX_SOLUTION: i32 = 22;
 
 pub fn run(choice: i32) {
     match choice {
@@ -39,6 +40,7 @@ pub fn run(choice: i32) {
         16 => solution16::solution16(),
         17 => solution17::solution17(),
         18 => solution18::solution18(),
-        _ => ()
+        22 => solution22::solution22(),
+        x => panic!("Solution {} is not implemented", x)
     }
 }
