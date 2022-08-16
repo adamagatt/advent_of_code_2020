@@ -4,10 +4,7 @@ use itertools::iproduct;
 use crate::utils::read_string_lines;
 
 pub fn solution18 () {
-    let input: Vec<SnailfishNumber> = read_string_lines("src/data/solution18.txt").iter()
-        .map(String::as_str)
-        .map(parse_snailfish_number)
-        .collect();
+    let input = read_input("src/data/solution18.txt");
     println!("{}", solution18a(&input));
     println!("{}", solution18b(&input));
 }
@@ -243,6 +240,13 @@ impl Node {
             }           
         };
     }
+}
+
+fn read_input(path: &str) -> Vec<SnailfishNumber> {
+    read_string_lines(path).iter()
+        .map(String::as_str)
+        .map(parse_snailfish_number)
+        .collect()
 }
 
 fn parse_snailfish_number(num_ser: &str) -> SnailfishNumber {
