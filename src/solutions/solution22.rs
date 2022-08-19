@@ -2,12 +2,12 @@ use crate::utils::read_string_lines;
 use itertools::iproduct;
 use regex::Regex;
 
-use std::{ops::RangeInclusive, cmp::{max, min}, collections::HashSet};
+use std::{ops::RangeInclusive, cmp::{max, min}};
 
 pub fn solution22 () {
     let commands = parse_commands(&read_string_lines("src/data/solution22.txt"));
     println!("{}", solution22a(&commands));
-    //println!("{}", solution22b(&commands));
+    println!("{}", solution22b(&commands));
 }
 
 fn solution22a(commands: &[Command]) -> usize {
@@ -33,21 +33,32 @@ fn solution22a(commands: &[Command]) -> usize {
         .count()
 }
 
-fn solution22b(commands: &[Command]) -> i32 {    
+fn solution22b(commands: &[Command]) -> u128 {    
     let mut active_regions = Vec::<Cube>::new();
 
     commands.iter().for_each(|command| {
-        iproduct!(
-            command.region.x_range.clone().0,
-            command.region.y_range.clone().0,
-            command.region.z_range.clone().0
-        ).for_each(|(x, y, z)| {
-            // if command.instruction == Instruction::On {
-            //     coords_on.insert((x, y, z));
-            // } else {
-            //     coords_on.remove(&(x, y, z));
-            // }
-        });
+        let mut new_cubes: Vec<Cube> = active_regions
+            // Remove any intersected regions for re-processing
+            .drain_filter(|region| region.intersects(&command.region))
+            // Subtract the current command region from any intersected regions
+            .flat_map(|region| {
+                let intersection = region.intersection(&command.region);
+                if intersection.contains(&region) {
+                    // Intersection might completely contain current region
+                    vec!()
+                } else {
+                    // Return parts of the region outside the intersection cube
+                    region.subtract_intersection(&intersection)
+                } 
+            })
+            // Clean up by filtering out any sub-cubes that are zero-area
+            .filter(|region| !region.is_empty())
+            // Add the current command region to the list if it is an ON instruction
+            .chain(if command.instruction == Instruction::On {vec!(command.region.clone())} else {vec!()})
+            .collect();
+
+        // The filtered regions vector has new and re-processed cubes added to the end
+        active_regions.append(&mut new_cubes);
     });
 
     active_regions.iter()
@@ -88,7 +99,7 @@ struct Command {
     region: Cube
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Cube{
     x_range: CoordRange,
     y_range: CoordRange,
@@ -102,10 +113,16 @@ impl Cube {
         self.z_range.is_empty()
     }
 
-    fn size(&self) -> i32 {
+    fn size(&self) -> u128 {
         vec!(&self.x_range, &self.y_range, &self.z_range).iter()
-            .map(|range| range.0.end() - range.0.start() + 1)
+            .map(|range| (range.0.end() - range.0.start() + 1) as u128)
             .product()
+    }
+
+    fn contains(&self, other: &Self) -> bool {
+        self.x_range.contains(&other.x_range) &&
+        self.y_range.contains(&other.y_range) &&
+        self.z_range.contains(&other.z_range)
     }
 
     fn intersection(&self, other: &Self) -> Self {
@@ -164,10 +181,13 @@ impl CoordRange {
 
     fn range_segments(&self, intersection: &Self) -> Vec<Self> {
         vec!(
-            Self(*self.0.start()..=(*intersection.0.start()-1)),
-            self.clone(),
-            Self((*intersection.0.end()+1)..=*self.0.end())
-        )
+            *self.0.start()..=(*intersection.0.start()-1),
+            intersection.0.clone(),
+            (*intersection.0.end()+1)..=*self.0.end()
+        ).into_iter()
+            .filter(|range| *range.end() >= *range.start())
+            .map(CoordRange)
+            .collect()
     }
 
     fn contains(&self, other: &Self) -> bool {
