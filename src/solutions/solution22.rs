@@ -7,20 +7,20 @@ use std::{ops::RangeInclusive, cmp::{max, min}, collections::HashSet};
 pub fn solution22 () {
     let commands = parse_commands(&read_string_lines("src/data/solution22.txt"));
     println!("{}", solution22a(&commands));
-    println!("{}", solution22b(&commands));
+    //println!("{}", solution22b(&commands));
 }
 
 fn solution22a(commands: &[Command]) -> usize {
     let mut region = [[[false; 101]; 101]; 101];
-    let clip_to_region = |range| intersect_ranges(range, &(-50..=50));
+    let clip_to_region = |range: CoordRange| range.intersect_ranges(&CoordRange(-50..=50)).0;
     let add_offset = |input: i32| (input + 50) as usize; 
 
     commands.iter().for_each(|command| {
         let assign_value = command.instruction == Instruction::On;
         iproduct!(
-            clip_to_region(&command.x_range),
-            clip_to_region(&command.y_range),
-            clip_to_region(&command.z_range)
+            clip_to_region(command.region.x_range.clone()),
+            clip_to_region(command.region.y_range.clone()),
+            clip_to_region(command.region.z_range.clone())
         ).for_each(|(x, y, z)| {
             region[add_offset(x)][add_offset(y)][add_offset(z)] = assign_value;
         });
@@ -33,40 +33,27 @@ fn solution22a(commands: &[Command]) -> usize {
         .count()
 }
 
-fn solution22b(commands: &[Command]) -> usize {    
-    let mut coords_on = HashSet::new();
+fn solution22b(commands: &[Command]) -> i32 {    
+    let mut active_regions = Vec::<Cube>::new();
 
-    commands.iter().enumerate().for_each(|(idx, command)| {
-        dbg!(idx);
-
+    commands.iter().for_each(|command| {
         iproduct!(
-            command.x_range.clone(),
-            command.y_range.clone(),
-            command.z_range.clone()
+            command.region.x_range.clone().0,
+            command.region.y_range.clone().0,
+            command.region.z_range.clone().0
         ).for_each(|(x, y, z)| {
-            if command.instruction == Instruction::On {
-                coords_on.insert((x, y, z));
-            } else {
-                coords_on.remove(&(x, y, z));
-            }
+            // if command.instruction == Instruction::On {
+            //     coords_on.insert((x, y, z));
+            // } else {
+            //     coords_on.remove(&(x, y, z));
+            // }
         });
     });
 
-    coords_on.len()
+    active_regions.iter()
+        .map(|region| region.size())
+        .sum()
 }
-
-#[derive(Debug)]
-struct Command {
-    instruction: Instruction,
-    x_range: CoordRange,
-    y_range: CoordRange,
-    z_range: CoordRange,
-}
-
-#[derive(Debug, PartialEq)]
-enum Instruction {On, Off}
-
-type CoordRange = RangeInclusive<i32>;
 
 fn parse_commands(input_lines: &[String]) -> Vec<Command> {
     let re = Regex::new(r"(on|off).x=(-?\d+)..(-?\d+),y=(-?\d+)..(-?\d+),z=(-?\d+)..(-?\d+)")
@@ -86,13 +73,104 @@ fn parse_commands(input_lines: &[String]) -> Vec<Command> {
         )})
         .map(|(instruction, ranges)| Command {
             instruction,
-            x_range: RangeInclusive::new(ranges[0], ranges[1]),
-            y_range: RangeInclusive::new(ranges[2], ranges[3]),
-            z_range: RangeInclusive::new(ranges[4], ranges[5])
+            region: Cube {
+                x_range: CoordRange(ranges[0]..=ranges[1]),
+                y_range: CoordRange(ranges[2]..=ranges[3]),
+                z_range: CoordRange(ranges[4]..=ranges[5])
+            }
         })
         .collect()
 }
 
-fn intersect_ranges<T: Ord+Copy>(left: &RangeInclusive<T>, right: &RangeInclusive<T>) -> RangeInclusive<T> {
-    max(*left.start(), *right.start())..=min(*left.end(),*right.end())
+#[derive(Debug)]
+struct Command {
+    instruction: Instruction,
+    region: Cube
+}
+
+#[derive(Debug)]
+struct Cube{
+    x_range: CoordRange,
+    y_range: CoordRange,
+    z_range: CoordRange,
+}
+
+impl Cube {
+    fn is_empty(&self) -> bool {
+        self.x_range.is_empty() ||
+        self.y_range.is_empty() ||
+        self.z_range.is_empty()
+    }
+
+    fn size(&self) -> i32 {
+        vec!(&self.x_range, &self.y_range, &self.z_range).iter()
+            .map(|range| range.0.end() - range.0.start() + 1)
+            .product()
+    }
+
+    fn intersection(&self, other: &Self) -> Self {
+        Self {
+            x_range: self.x_range.intersect_ranges(&other.x_range),
+            y_range: self.y_range.intersect_ranges(&other.y_range),
+            z_range: self.z_range.intersect_ranges(&other.z_range)
+        }
+    }
+
+    fn intersects(&self, other: &Self) -> bool {
+        let intersection = self.intersection(other);
+        !intersection.x_range.is_empty() &&
+        !intersection.y_range.is_empty() &&
+        !intersection.z_range.is_empty()
+    }
+
+    fn subtract_intersection(&self, intersection: &Self) -> Vec<Self> {
+        let mut subcubes = Vec::<Self>::new();
+
+        iproduct!(
+            self.x_range.range_segments(&intersection.x_range),
+            self.y_range.range_segments(&intersection.y_range),
+            self.z_range.range_segments(&intersection.z_range)
+        )
+            .filter(|(x_range, y_range, z_range)| {
+                !x_range.equal_ranges(&intersection.x_range) ||
+                !y_range.equal_ranges(&intersection.y_range) ||
+                !z_range.equal_ranges(&intersection.z_range)
+            })
+            .for_each(|(x_range, y_range, z_range)| {
+                subcubes.push(Cube { x_range, y_range, z_range });
+            });
+        subcubes
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Instruction {On, Off}
+
+#[derive(Clone, Debug)]
+struct CoordRange(RangeInclusive<i32>);
+
+impl CoordRange {
+    fn is_empty(&self) -> bool { self.0.is_empty() }
+
+    fn intersect_ranges(&self, other: &Self) -> Self {
+        Self (
+            max(*self.0.start(), *other.0.start())..=min(*self.0.end(),*other.0.end())
+        )
+    }
+
+    fn equal_ranges(&self, other: &Self) -> bool {
+        *self.0.start() == *other.0.start()  && *self.0.end() == *other.0.end()
+    }
+
+    fn range_segments(&self, intersection: &Self) -> Vec<Self> {
+        vec!(
+            Self(*self.0.start()..=(*intersection.0.start()-1)),
+            self.clone(),
+            Self((*intersection.0.end()+1)..=*self.0.end())
+        )
+    }
+
+    fn contains(&self, other: &Self) -> bool {
+        self.0.start() <= other.0.end() && self.0.end() < other.0.start()
+    }
 }
