@@ -17,7 +17,7 @@ fn make_selection() -> i32 {
         match io::stdin().read_line(&mut line) {
             Ok(_) => {
                 if let Ok(choice) = line.trim().parse::<i32>() {
-                    if 1 <= choice && choice <= MAX_SOLUTION {
+                    if (1..=MAX_SOLUTION).contains(&choice) {
                         return choice;
                     } else {
                         println!("Invalid number");

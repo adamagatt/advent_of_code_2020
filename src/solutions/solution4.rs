@@ -56,12 +56,9 @@ fn solution4a(input_lines: &[String]) -> i32 {
     for draw in draws {   
         mark_drawn_spaces(&mut spaces_for_draw, draw);
 
-        match boards.iter().find(|board| board.is_solved()) {
-            Some(solved_board) => {
-                return draw * solved_board.sum_unmarked()
-            },
-            None => ()
-        }
+        if let Some(solved_board) = boards.iter().find(|board| board.is_solved()) {
+            return draw * solved_board.sum_unmarked()
+        };
     }
 
     panic!("No bingo board was solved!");

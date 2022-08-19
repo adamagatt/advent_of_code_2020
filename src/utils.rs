@@ -59,7 +59,7 @@ pub fn read_string_pairs(path: &str, separator: char) -> Vec<(String, String)> {
 }
 
 pub fn iterate_file_lines(path: &str) -> impl Iterator<Item = Result<String, Box<dyn Error>>> {
-    let file = File::open(path).expect(&format!("Unable to open file at {}", path));
+    let file = File::open(path).unwrap_or_else(|_| panic!("Unable to open file at {}", path));
     BufReader::new(file)
         .lines()
         .map(|line| line.map_err(box_error))
