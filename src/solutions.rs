@@ -21,6 +21,7 @@ mod solution16;
 mod solution17;
 mod solution18;
 mod solution22;
+mod solution23;
 
 lazy_static! {
     pub static ref SOLVED_PROBLEMS: BTreeMap<i32, fn() -> ()> = BTreeMap::from([
@@ -42,7 +43,8 @@ lazy_static! {
         (16, solution16::solution16 as fn()),
         (17, solution17::solution17 as fn()),
         (18, solution18::solution18 as fn()),
-        (22, solution22::solution22 as fn())
+        (22, solution22::solution22 as fn()),
+        (23, solution23::solution23 as fn())
     ]);
 }
 
