@@ -49,13 +49,13 @@ fn insert_node(list: &mut Vec<SearchNode>, node: &SearchNode) {
 
 fn get_node<'a, 'b>(list: &'a mut [SearchNode], target: &'b SearchNode) -> Option<&'a mut SearchNode> {
     list.iter_mut()
-        .find(|node| states_equal(&node.state, &target.state))
+        .find(|node| search_nodes_equal(node, target))
 }
 
 type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
 
-#[derive (Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive (Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum AmphipodType {A, B, C, D}
 
 #[derive (Clone, PartialEq, Eq, Hash)]
@@ -81,10 +81,10 @@ fn coord_pairs_equal(left: &CoordPair, right: &CoordPair) -> bool {
 }
 
 fn states_equal(left: &State, right: &State) -> bool {
-    each_amphipod_type().all(|amphipodType|
-        left.locs.contains_key(amphipodType) &&
-        right.locs.contains_key(amphipodType) &&
-        coord_pairs_equal(&left.locs[&amphipodType], &right.locs[&amphipodType])
+    each_amphipod_type().all(|amp_type|
+        left.locs.contains_key(amp_type) &&
+        right.locs.contains_key(amp_type) &&
+        coord_pairs_equal(&left.locs[amp_type], &right.locs[amp_type])
     )
 }
 
@@ -98,36 +98,41 @@ fn each_amphipod_type() -> impl Iterator<Item=&'static AmphipodType> {
 }
 
 fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
-    let new_states = vec!(current.state.clone());
-
     // Any of the Amphipod types can attempt to move a space
     each_amphipod_type().map(
-        |amphipod_type| (current.state.locs[amphipod_type], MOVEMENT_COSTS[amphipod_type])
+        |amphipod_type| (amphipod_type, current.state.locs[amphipod_type])
     )
       // Check both Amphipods of the type
-    .flat_map(|(amphipod, movement_cost)| {
+    .flat_map(|(amphipod_type, amphipod)| {
         vec!(
-            ((amphipod[0], amphipod[1]), movement_cost),
-            ((amphipod[1], amphipod[0]), movement_cost)
+            (amphipod_type, (amphipod[0], amphipod[1])),
+            (amphipod_type, (amphipod[1], amphipod[0]))
         )
     })
     // Check each possible destination
-    .flat_map(|((amphipod, other_amphipod), movement_cost)| {
+    .flat_map(|(&amphipod_type, (amphipod, other_amphipod))| {
+        let copied_amphipod_type = amphipod_type;
         CONNECTIONS.get(&amphipod).unwrap().iter()
-            .map(|new_loc| true)
-    });
-
-    new_states.iter()
-        .map(|state| {
-            let additional_cost = 1;
-            let remaining_cost = estimate_remaining_cost(state);
-            SearchNode {
-                state: state.clone(),
-                current_cost: current.current_cost + additional_cost,
-                total_cost_estimate: current.current_cost + 1 + remaining_cost
-            }
-        })
-        .collect()
+            // Can't move to where another amphipod currently is
+            .filter(|&new_loc| !any_amphipod_in_space(&current.state, new_loc))
+            // Create new state with moved amphipod
+            .map(move |&new_loc| {
+                let mut new_state = current.state.clone();
+                new_state.locs.insert(copied_amphipod_type, [new_loc, other_amphipod]);
+                new_state
+            })
+            // Put state in new graph node with calculated/estimated costs
+            .map(move |new_state| {
+                let additional_cost = MOVEMENT_COSTS[&amphipod_type];
+                let remaining_cost = estimate_remaining_cost(&new_state);
+                SearchNode {
+                    state: new_state,
+                    current_cost: current.current_cost + additional_cost,
+                    total_cost_estimate: current.current_cost + additional_cost + remaining_cost
+                }
+            })
+    })
+    .collect()
 }
 
 fn estimate_remaining_cost(state: &State) -> u32 {
@@ -148,6 +153,12 @@ fn estimate_remaining_cost(state: &State) -> u32 {
 
 fn manhattan(a: &Coord, b: &Coord) -> u32 {
     a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
+}
+
+fn any_amphipod_in_space(state: &State, space: &Coord) -> bool {
+    state.locs.values()
+        .flat_map(|pair| pair.iter())
+        .any(|f| f == space)
 }
 
 // Map is hard-coded and unchanging and so we can pre-calculate our
