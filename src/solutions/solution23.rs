@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeMap};
 
 pub fn solution23 () {
     println!("{}", solution23a());
@@ -10,11 +10,11 @@ fn solution23a() -> u32 {
     // States adjacent to those we have visited
     let mut known = Vec::<SearchNode>::new();
     // States we have visited and won't need to consider again
-    let mut visited: HashSet<State> = HashSet::from([*INITIAL]);
+    let mut visited: HashSet<State> = HashSet::from([INITIAL.clone()]);
 
     while !known.is_empty() {
         let next_node = known.remove(0);
-        visited.insert(next_node.state);
+        visited.insert(next_node.state.clone());
 
         if states_equal(&next_node.state, &GOAL) {
             return next_node.current_cost;
@@ -55,19 +55,13 @@ fn get_node<'a, 'b>(list: &'a mut [SearchNode], target: &'b SearchNode) -> Optio
 type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
 
-#[derive (Clone, Copy, PartialEq, Eq, Hash)]
-struct State {
-    a: CoordPair,
-    b: CoordPair,
-    c: CoordPair,
-    d: CoordPair
-}
+#[derive (Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+enum AmphipodType {A, B, C, D}
 
-struct Costs {
-    a: u32,
-    b: u32,
-    c: u32,
-    d: u32
+#[derive (Clone, PartialEq, Eq, Hash)]
+struct State {
+    // Required to be a BTreeMap as HashMap does not implement the Hash trait
+    locs: BTreeMap<AmphipodType, CoordPair>
 }
 
 #[derive (Clone)]
@@ -87,11 +81,11 @@ fn coord_pairs_equal(left: &CoordPair, right: &CoordPair) -> bool {
 }
 
 fn states_equal(left: &State, right: &State) -> bool {
-    // States are equal if amphipod locations are equal
-    coord_pairs_equal(&left.a, &right.a) &&
-    coord_pairs_equal(&left.b, &right.b) &&
-    coord_pairs_equal(&left.c, &right.c) &&
-    coord_pairs_equal(&left.d, &right.d)
+    each_amphipod_type().all(|amphipodType|
+        left.locs.contains_key(amphipodType) &&
+        right.locs.contains_key(amphipodType) &&
+        coord_pairs_equal(&left.locs[&amphipodType], &right.locs[&amphipodType])
+    )
 }
 
 // Nodes in the graph search are considered the same if they have matching states, ignoring costs
@@ -99,35 +93,36 @@ fn search_nodes_equal(left: &SearchNode, right: &SearchNode) -> bool {
     states_equal(&left.state, &right.state)
 }
 
+fn each_amphipod_type() -> impl Iterator<Item=&'static AmphipodType> {
+    [AmphipodType::A, AmphipodType::B, AmphipodType::C, AmphipodType::D].iter()
+}
+
 fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
-    let new_states = vec!(current.state);
+    let new_states = vec!(current.state.clone());
 
     // Any of the Amphipod types can attempt to move a space
-    [
-        (&current.state.a, MOVEMENT_COSTS.a),
-        (&current.state.b, MOVEMENT_COSTS.b),
-        (&current.state.c, MOVEMENT_COSTS.c),
-        (&current.state.d, MOVEMENT_COSTS.d)
-    ].iter()
-        // Check both Amphipods of the type
-        .flat_map(|(amphipod, movement_cost)| {
-            vec!(
-                ((amphipod[0], amphipod[1]), movement_cost),
-                ((amphipod[1], amphipod[0]), movement_cost)
-            )
-        })
-        // Check each possible destination
-        .flat_map(|((amphipod, other_amphipod), movement_cost)| {
-            CONNECTIONS.get(&amphipod).unwrap().iter()
-                .map(|new_loc| true)
-        });
+    each_amphipod_type().map(
+        |amphipod_type| (current.state.locs[amphipod_type], MOVEMENT_COSTS[amphipod_type])
+    )
+      // Check both Amphipods of the type
+    .flat_map(|(amphipod, movement_cost)| {
+        vec!(
+            ((amphipod[0], amphipod[1]), movement_cost),
+            ((amphipod[1], amphipod[0]), movement_cost)
+        )
+    })
+    // Check each possible destination
+    .flat_map(|((amphipod, other_amphipod), movement_cost)| {
+        CONNECTIONS.get(&amphipod).unwrap().iter()
+            .map(|new_loc| true)
+    });
 
     new_states.iter()
         .map(|state| {
             let additional_cost = 1;
             let remaining_cost = estimate_remaining_cost(state);
             SearchNode {
-                state: *state,
+                state: state.clone(),
                 current_cost: current.current_cost + additional_cost,
                 total_cost_estimate: current.current_cost + 1 + remaining_cost
             }
@@ -138,20 +133,17 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
 fn estimate_remaining_cost(state: &State) -> u32 {
     // Calculated as simple manhattan distance to get both amphipods of each colour to
     // their goal.
-    [
-        (&state.a, &GOAL.a, &MOVEMENT_COSTS.a),
-        (&state.b, &GOAL.b, &MOVEMENT_COSTS.b),
-        (&state.c, &GOAL.c, &MOVEMENT_COSTS.c),
-        (&state.d, &GOAL.d, &MOVEMENT_COSTS.d)
-    ].iter()
-        .map(|(&current_locs, &goal_locs, &movement_cost)|
-            // Compare the two alternatives for matching amphipods to goal spaces
-            std::cmp::min(
-                manhattan(&current_locs[0], &goal_locs[0]) + manhattan(&current_locs[1], &goal_locs[1]),
-                manhattan(&current_locs[0], &goal_locs[1]) + manhattan(&current_locs[1], &goal_locs[0])
-            ) * movement_cost
-        )
-        .sum()
+    each_amphipod_type().map(|amphipod_type|
+        (state.locs[amphipod_type], GOAL.locs[amphipod_type], MOVEMENT_COSTS[amphipod_type])
+    )
+    .map(|(current_locs, goal_locs, movement_cost)|
+        // Compare the two alternatives for matching amphipods to goal spaces
+        std::cmp::min(
+            manhattan(&current_locs[0], &goal_locs[0]) + manhattan(&current_locs[1], &goal_locs[1]),
+            manhattan(&current_locs[0], &goal_locs[1]) + manhattan(&current_locs[1], &goal_locs[0])
+        ) * movement_cost
+    )
+    .sum()
 }
 
 fn manhattan(a: &Coord, b: &Coord) -> u32 {
@@ -190,23 +182,27 @@ lazy_static! {
     ]);
 
     static ref INITIAL: State = State {
-        a: [(1, 8), (2, 8)],
-        b: [(1, 2), (2, 6)],
-        c: [(1, 6), (2, 2)],
-        d: [(1, 4), (2, 4)]
+        locs: BTreeMap::from([
+            (AmphipodType::A, [(1, 8), (2, 8)]),
+            (AmphipodType::B, [(1, 2), (2, 6)]),
+            (AmphipodType::C, [(1, 6), (2, 2)]),
+            (AmphipodType::D, [(1, 4), (2, 4)])
+        ])
     };
 
     static ref GOAL: State = State {
-        a: [(1, 2), (2, 2)],
-        b: [(1, 4), (2, 4)],
-        c: [(1, 6), (2, 6)],
-        d: [(1, 8), (2, 8)]
+        locs: BTreeMap::from([
+            (AmphipodType::A, [(1, 2), (2, 2)]),
+            (AmphipodType::B, [(1, 4), (2, 4)]),
+            (AmphipodType::C, [(1, 6), (2, 6)]),
+            (AmphipodType::D, [(1, 8), (2, 8)])
+        ])
     };
 
-    static ref MOVEMENT_COSTS: Costs = Costs{
-        a: 1,
-        b: 10,
-        c: 100,
-        d: 1000
-    };
+    static ref MOVEMENT_COSTS: HashMap::<AmphipodType, u32> = HashMap::from([
+        (AmphipodType::A, 1),
+        (AmphipodType::B, 10),
+        (AmphipodType::C, 100),
+        (AmphipodType::D, 1000)
+    ]);
 }
