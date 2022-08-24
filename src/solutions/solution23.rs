@@ -1,25 +1,80 @@
 use lazy_static::lazy_static;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub fn solution23 () {
     println!("{}", solution23a());
 //    println!("{}", solution23b());
 }
 
-fn solution23a() -> usize {
-    5
+fn solution23a() -> u32 {
+    // States adjacent to those we have visited
+    let mut known = Vec::<SearchNode>::new();
+    // States we have visited and won't need to consider again
+    let mut visited: HashSet<State> = HashSet::from([*INITIAL]);
+
+    while !known.is_empty() {
+        let next_node = known.remove(0);
+        visited.insert(next_node.state);
+
+        if states_equal(&next_node.state, &GOAL) {
+            return next_node.current_cost;
+        } else {
+            for discovered in find_next_states(&next_node) {
+                if !visited.contains(&discovered.state) {
+                    insert_node(&mut known, &discovered);
+                }
+            }
+        }
+    }
+    panic!("No solution found!");
 }
 
-type Coord = (usize, usize); // (y, x)
+fn insert_node(list: &mut Vec<SearchNode>, node: &SearchNode) {
+    if let Some(found) = get_node(list, node) {
+        // If the node is already in the list then lower its cost if necessary
+        if node.current_cost < found.current_cost {
+            found.current_cost = node.current_cost;
+            found.total_cost_estimate = node.total_cost_estimate;
+        }
+    } else {
+        // Add to list if not previously present
+        list.push(node.clone());
+    }
+
+    // Re-sort the list, since we may have added a node or revised a cost. Sorting is done
+    // by "total" cost, a combination of the known cost to get there and the guess of
+    // the remaining distance
+    list.sort_by_key(|node| node.total_cost_estimate);
+}
+
+fn get_node<'a, 'b>(list: &'a mut [SearchNode], target: &'b SearchNode) -> Option<&'a mut SearchNode> {
+    list.iter_mut()
+        .find(|node| states_equal(&node.state, &target.state))
+}
+
+type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
 
-#[derive (Clone, Eq, PartialEq, Hash)]
-enum AmphipodType {A, B, C, D}
+#[derive (Clone, Copy, PartialEq, Eq, Hash)]
+struct State {
+    a: CoordPair,
+    b: CoordPair,
+    c: CoordPair,
+    d: CoordPair
+}
+
+struct Costs {
+    a: u32,
+    b: u32,
+    c: u32,
+    d: u32
+}
 
 #[derive (Clone)]
-struct State {
-    locations: HashMap<AmphipodType, CoordPair>,
-    cost: u32
+struct SearchNode {
+    state: State,
+    current_cost: u32,
+    total_cost_estimate: u32
 }
 
 fn coords_equal(left: &Coord, right: &Coord) -> bool {
@@ -32,13 +87,75 @@ fn coord_pairs_equal(left: &CoordPair, right: &CoordPair) -> bool {
 }
 
 fn states_equal(left: &State, right: &State) -> bool {
-    left.locations.keys().eq(right.locations.keys()) &&
-    left.locations.keys()
-        .all(|key| {
-            let left_coord_pair = left.locations.get(key).unwrap();
-            let right_coord_pair = right.locations.get(key).unwrap();
-            coord_pairs_equal(left_coord_pair, right_coord_pair)
+    // States are equal if amphipod locations are equal
+    coord_pairs_equal(&left.a, &right.a) &&
+    coord_pairs_equal(&left.b, &right.b) &&
+    coord_pairs_equal(&left.c, &right.c) &&
+    coord_pairs_equal(&left.d, &right.d)
+}
+
+// Nodes in the graph search are considered the same if they have matching states, ignoring costs
+fn search_nodes_equal(left: &SearchNode, right: &SearchNode) -> bool {
+    states_equal(&left.state, &right.state)
+}
+
+fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
+    let new_states = vec!(current.state);
+
+    // Any of the Amphipod types can attempt to move a space
+    [
+        (&current.state.a, MOVEMENT_COSTS.a),
+        (&current.state.b, MOVEMENT_COSTS.b),
+        (&current.state.c, MOVEMENT_COSTS.c),
+        (&current.state.d, MOVEMENT_COSTS.d)
+    ].iter()
+        // Check both Amphipods of the type
+        .flat_map(|(amphipod, movement_cost)| {
+            vec!(
+                ((amphipod[0], amphipod[1]), movement_cost),
+                ((amphipod[1], amphipod[0]), movement_cost)
+            )
         })
+        // Check each possible destination
+        .flat_map(|((amphipod, other_amphipod), movement_cost)| {
+            CONNECTIONS.get(&amphipod).unwrap().iter()
+                .map(|new_loc| true)
+        });
+
+    new_states.iter()
+        .map(|state| {
+            let additional_cost = 1;
+            let remaining_cost = estimate_remaining_cost(state);
+            SearchNode {
+                state: *state,
+                current_cost: current.current_cost + additional_cost,
+                total_cost_estimate: current.current_cost + 1 + remaining_cost
+            }
+        })
+        .collect()
+}
+
+fn estimate_remaining_cost(state: &State) -> u32 {
+    // Calculated as simple manhattan distance to get both amphipods of each colour to
+    // their goal.
+    [
+        (&state.a, &GOAL.a, &MOVEMENT_COSTS.a),
+        (&state.b, &GOAL.b, &MOVEMENT_COSTS.b),
+        (&state.c, &GOAL.c, &MOVEMENT_COSTS.c),
+        (&state.d, &GOAL.d, &MOVEMENT_COSTS.d)
+    ].iter()
+        .map(|(&current_locs, &goal_locs, &movement_cost)|
+            // Compare the two alternatives for matching amphipods to goal spaces
+            std::cmp::min(
+                manhattan(&current_locs[0], &goal_locs[0]) + manhattan(&current_locs[1], &goal_locs[1]),
+                manhattan(&current_locs[0], &goal_locs[1]) + manhattan(&current_locs[1], &goal_locs[0])
+            ) * movement_cost
+        )
+        .sum()
+}
+
+fn manhattan(a: &Coord, b: &Coord) -> u32 {
+    a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
 }
 
 // Map is hard-coded and unchanging and so we can pre-calculate our
@@ -72,23 +189,24 @@ lazy_static! {
         ((2,  8), vec!((1,  8)))
     ]);
 
-    static ref GOAL: State = State {
-        locations: HashMap::from([
-            (AmphipodType::A, [(1, 2), (2, 2)]),
-            (AmphipodType::B, [(1, 4), (2, 4)]),
-            (AmphipodType::C, [(1, 6), (2, 6)]),
-            (AmphipodType::D, [(1, 8), (2, 8)])
-        ]),
-        cost: 0 // Cost isn't relevant for determining if goal is reached or not
+    static ref INITIAL: State = State {
+        a: [(1, 8), (2, 8)],
+        b: [(1, 2), (2, 6)],
+        c: [(1, 6), (2, 2)],
+        d: [(1, 4), (2, 4)]
     };
 
-    static ref INITIAL: State = State {
-        locations: HashMap::from([
-            (AmphipodType::A, [(1, 8), (2, 8)]),
-            (AmphipodType::B, [(1, 2), (2, 6)]),
-            (AmphipodType::C, [(1, 6), (2, 2)]),
-            (AmphipodType::D, [(1, 4), (2, 4)])
-        ]),
-        cost: 0
+    static ref GOAL: State = State {
+        a: [(1, 2), (2, 2)],
+        b: [(1, 4), (2, 4)],
+        c: [(1, 6), (2, 6)],
+        d: [(1, 8), (2, 8)]
+    };
+
+    static ref MOVEMENT_COSTS: Costs = Costs{
+        a: 1,
+        b: 10,
+        c: 100,
+        d: 1000
     };
 }
