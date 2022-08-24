@@ -1,5 +1,7 @@
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet, BTreeMap};
+use std::hash::Hash;
+use std::fmt::Debug;
 
 pub fn solution23 () {
     println!("{}", solution23a());
@@ -10,15 +12,37 @@ fn solution23a() -> u32 {
     // States adjacent to those we have visited
     let mut known = Vec::<SearchNode>::new();
     // States we have visited and won't need to consider again
-    let mut visited: HashSet<State> = HashSet::from([INITIAL.clone()]);
+    let mut visited = HashSet::<State>::new();
+
+    // First node to expand is initial state with no cost
+    known.push(
+        SearchNode {
+            state: INITIAL.clone(),
+            current_cost: 0,
+            total_cost_estimate: estimate_remaining_cost(&INITIAL)
+        }
+    );
+
+    let mut viscount = 0;
+    let mut BEST_EST = 999999999;
 
     while !known.is_empty() {
         let next_node = known.remove(0);
         visited.insert(next_node.state.clone());
 
+        if (visited.len() - viscount) >= 1000 {
+            viscount = visited.len();
+            println!("{}", viscount);
+        }
+        if next_node.total_cost_estimate < BEST_EST {
+            BEST_EST = next_node.total_cost_estimate;
+            println!("NEW BEST: {}", BEST_EST);
+        }
+
+
         if states_equal(&next_node.state, &GOAL) {
             return next_node.current_cost;
-        } else {
+        } else {            
             for discovered in find_next_states(&next_node) {
                 if !visited.contains(&discovered.state) {
                     insert_node(&mut known, &discovered);
@@ -55,13 +79,19 @@ fn get_node<'a, 'b>(list: &'a mut [SearchNode], target: &'b SearchNode) -> Optio
 type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
 
-#[derive (Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive (Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum AmphipodType {A, B, C, D}
 
 #[derive (Clone, PartialEq, Eq, Hash)]
 struct State {
     // Required to be a BTreeMap as HashMap does not implement the Hash trait
     locs: BTreeMap<AmphipodType, CoordPair>
+}
+
+impl Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:?}, {:?}, {:?}, {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::C], self.locs[&AmphipodType::D])
+    }
 }
 
 #[derive (Clone)]
@@ -102,7 +132,7 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
     each_amphipod_type().map(
         |amphipod_type| (amphipod_type, current.state.locs[amphipod_type])
     )
-      // Check both Amphipods of the type
+    // Check both Amphipods of the type
     .flat_map(|(amphipod_type, amphipod)| {
         vec!(
             (amphipod_type, (amphipod[0], amphipod[1])),
@@ -114,13 +144,23 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
         let copied_amphipod_type = amphipod_type;
         CONNECTIONS.get(&amphipod).unwrap().iter()
             // Can't move to where another amphipod currently is
-            .filter(|&new_loc| !any_amphipod_in_space(&current.state, new_loc))
+            .filter(|&new_loc| get_amphipod_in_space(&current.state, new_loc).is_none())
             // Create new state with moved amphipod
             .map(move |&new_loc| {
+                let mut new_amphipod_locations = [new_loc, other_amphipod];
+                new_amphipod_locations.sort();
+
                 let mut new_state = current.state.clone();
-                new_state.locs.insert(copied_amphipod_type, [new_loc, other_amphipod]);
+                new_state.locs.insert(copied_amphipod_type, new_amphipod_locations);
                 new_state
             })
+            // An intersection can't be occupied for two states in a row
+            .filter(|new_state|
+                !INTERSECTIONS.iter().any(|intersection|
+                    get_amphipod_in_space(new_state, intersection).is_some() &&
+                    get_amphipod_in_space(&current.state, intersection).is_some()
+                )
+            )
             // Put state in new graph node with calculated/estimated costs
             .map(move |new_state| {
                 let additional_cost = MOVEMENT_COSTS[&amphipod_type];
@@ -155,10 +195,13 @@ fn manhattan(a: &Coord, b: &Coord) -> u32 {
     a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
 }
 
-fn any_amphipod_in_space(state: &State, space: &Coord) -> bool {
-    state.locs.values()
-        .flat_map(|pair| pair.iter())
-        .any(|f| f == space)
+fn get_amphipod_in_space(state: &State, space: &Coord) -> Option<AmphipodType> {
+    state.locs.iter()
+        .flat_map(move |(amp_type, pair)|
+            pair.iter().map(move |coord| (*amp_type, coord))
+        )
+        .find(|&f| f.1 == space)
+        .map(|(amp_type, _)| amp_type)
 }
 
 // Map is hard-coded and unchanging and so we can pre-calculate our
@@ -190,6 +233,10 @@ lazy_static! {
         ((2,  6), vec!((1,  6))),
         ((1,  8), vec!((0,  8), (2,  8))),
         ((2,  8), vec!((1,  8)))
+    ]);
+
+    static ref INTERSECTIONS: Vec<Coord> = Vec::from([
+        (0, 2), (0, 4), (0, 6), (0 ,8)
     ]);
 
     static ref INITIAL: State = State {
