@@ -176,23 +176,32 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
 }
 
 fn estimate_remaining_cost(state: &State) -> u32 {
-    // Calculated as simple manhattan distance to get both amphipods of each colour to
-    // their goal.
+    // Optimistic estimate of the movement cost required to get both amphipods of each colour to
+    // their goals, ignoring all obstacles
     each_amphipod_type().map(|amphipod_type|
-        (state.locs[amphipod_type], GOAL.locs[amphipod_type], MOVEMENT_COSTS[amphipod_type])
+        (state.locs[&amphipod_type], GOAL.locs[&amphipod_type], MOVEMENT_COSTS[&amphipod_type])
     )
     .map(|(current_locs, goal_locs, movement_cost)|
         // Compare the two alternatives for matching amphipods to goal spaces
         std::cmp::min(
-            manhattan(&current_locs[0], &goal_locs[0]) + manhattan(&current_locs[1], &goal_locs[1]),
-            manhattan(&current_locs[0], &goal_locs[1]) + manhattan(&current_locs[1], &goal_locs[0])
+            walk_distance(&current_locs[0], &goal_locs[0]) + walk_distance(&current_locs[1], &goal_locs[1]),
+            walk_distance(&current_locs[0], &goal_locs[1]) + walk_distance(&current_locs[1], &goal_locs[0])
         ) * movement_cost
     )
     .sum()
 }
 
-fn manhattan(a: &Coord, b: &Coord) -> u32 {
-    a.0.abs_diff(b.0) + a.1.abs_diff(b.1)
+// Distance to walk from coord A to B, ignoring any obstacles. Calculated as horizontal offset
+// plus distance to walk to and from corridor if needed
+fn walk_distance(a: &Coord, b: &Coord) -> u32 {
+    // If on the same column then only vertical offset needed
+    if a.1 == b.1 {
+        a.0.abs_diff(b.0)
+    } else {
+        // Otherwise we want the horizontal offset plus distance to walk
+        // to/from the corridor
+        a.1.abs_diff(b.1) + a.0 + b.0
+    }
 }
 
 fn get_amphipod_in_space(state: &State, space: &Coord) -> Option<AmphipodType> {
