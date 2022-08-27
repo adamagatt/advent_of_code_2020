@@ -244,8 +244,23 @@ lazy_static! {
         ((2,  8), vec!((1,  8)))
     ]);
 
-    static ref INTERSECTIONS: Vec<Coord> = Vec::from([
+    static ref INTERSECTIONS: HashSet<Coord> = HashSet::from([
         (0, 2), (0, 4), (0, 6), (0 ,8)
+    ]);
+
+    static ref HALLWAY: HashSet<Coord> = HashSet::from([
+        (0, 0), (0, 1), (0, 3), (0 ,5), (0, 7), (0, 9), (0, 10)
+    ]);
+
+    static ref ROOMS: HashMap<Coord, AmphipodType> = HashMap::from([
+        ((1, 2), AmphipodType::A),
+        ((2, 2), AmphipodType::A),
+        ((1, 4), AmphipodType::B),
+        ((2, 4), AmphipodType::B),
+        ((1, 6), AmphipodType::C),
+        ((2, 6), AmphipodType::C),
+        ((1, 8), AmphipodType::D),
+        ((2, 8), AmphipodType::D)
     ]);
 
     static ref INITIAL: State = State {
