@@ -51,7 +51,7 @@ fn solution23a() -> u32 {
         } else {       
             for discovered in find_next_states(&next_node) {
                 if !visited.contains(&discovered.state) {
-                    insert_node(&mut known, &discovered);
+                    upsert_node(&mut known, &discovered);
                 }
             }
         }
@@ -59,30 +59,35 @@ fn solution23a() -> u32 {
     panic!("No solution found!");
 }
 
-fn insert_node(list: &mut Vec<SearchNode>, new_node: &SearchNode) {
-    let current_node_idx = if let Some(found_idx) = find_node_idx(list, new_node) {
-        // If this node is already in our search vector then see if its cost might be revised
-        let found = list.get_mut(found_idx).unwrap();
-        // If the current cost is lower then we have nothing to do
-        if found.current_cost <= new_node.current_cost {
-            return;
-        }
+fn upsert_node(list: &mut Vec<SearchNode>, new_node: &SearchNode) {
+    let current_node_idx =
+        if let Some(found_idx) = find_node_idx(list, new_node) {
+            // If this node is already in our search vector then see if its cost might be revised
+            let found = list.get_mut(found_idx).unwrap();
+            // If the current cost is lower then we have nothing to do
+            if found.current_cost <= new_node.current_cost {
+                return;
+            }
 
-        // We revise the current cost and return the idx of this found node
-        found.current_cost = new_node.current_cost;
-        found.total_cost_estimate = new_node.total_cost_estimate;
+            // We revise the current cost and return the idx of this found node
+            found.current_cost = new_node.current_cost;
+            found.total_cost_estimate = new_node.total_cost_estimate;
 
-        found_idx
-    } else {
-        // If the node isn't in the vector we push it on the end and return that last idx
-        list.push(new_node.clone());
-        list.len()-1
-    };
+            found_idx
+        } else {
+            // If the node isn't in the vector we push it on the end and return that last idx
+            list.push(new_node.clone());
+            list.len()-1
+        };
 
     // We can now find the idx of where the node should be sorted to and rotate it to that position
-    // Whether Result is Ok or Error doesn't matter, only the difference between if another node
+    // NOTE 1: Whether Result is Ok or Error doesn't matter, only the difference between if another node
     // was already identified with this cost estimate or if this is the first node with that estimate
-    let new_idx = list.binary_search_by_key(&new_node.total_cost_estimate, |x| x.total_cost_estimate)
+    // NOTE 2: Binary Search is only valid for sorted lists, and only the list up until the inserted/revised
+    // node is guaranteed to be sorted. This is fine for our purposes as the node's sorted position
+    // can only be lower or equal to currently, as it is either added to the end of the list or its
+    // total estimate has been revised to a lower value.
+    let new_idx = list[..current_node_idx].binary_search_by_key(&new_node.total_cost_estimate, |x| x.total_cost_estimate)
         .into_ok_or_err();
     list[new_idx..=current_node_idx].rotate_right(1);
 }
