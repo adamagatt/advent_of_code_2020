@@ -5,7 +5,7 @@ use std::fmt::Debug;
 
 pub fn solution23 () {
     println!("{}", solution23a());
-//    println!("{}", solution23b());
+    // println!("{}", solution23b());
 }
 
 fn solution23a() -> u32 {
@@ -17,32 +17,38 @@ fn solution23a() -> u32 {
     // First node to expand is initial state with no cost
     known.push(
         SearchNode {
-            state: INITIAL.clone(),
+            state: INITIAL.clone(), 
             current_cost: 0,
             total_cost_estimate: estimate_remaining_cost(&INITIAL)
         }
     );
 
-    let mut viscount = 0;
-    let mut BEST_EST = 999999999;
+    let mut vis_count = 0;
+    let mut best_remaining = 999999999;
 
     while !known.is_empty() {
         let next_node = known.remove(0);
         visited.insert(next_node.state.clone());
 
-        if (visited.len() - viscount) >= 1000 {
-            viscount = visited.len();
-            println!("{}", viscount);
+        // dbg!(known.len());
+        // dbg!(visited.len());
+        // dbg!(&next_node.state, &next_node.current_cost, &next_node.total_cost_estimate);
+
+        if (visited.len() - vis_count) >= 1000 {
+            vis_count = visited.len();
+            println!("{}", vis_count);
         }
-        if next_node.total_cost_estimate < BEST_EST {
-            BEST_EST = next_node.total_cost_estimate;
-            println!("NEW BEST: {}", BEST_EST);
+        if (next_node.total_cost_estimate-next_node.current_cost) < best_remaining {
+            best_remaining = next_node.total_cost_estimate-next_node.current_cost;
+            println!("NEW BEST: {}", best_remaining);
+            dbg!(&next_node.state);
         }
 
 
-        if states_equal(&next_node.state, &GOAL) {
+        if next_node.state.eq(&GOAL) { // .eq() required instead of == due to lazy_static GOAL
+            println!("Solution found after {} nodes", visited.len());
             return next_node.current_cost;
-        } else {            
+        } else {       
             for discovered in find_next_states(&next_node) {
                 if !visited.contains(&discovered.state) {
                     insert_node(&mut known, &discovered);
@@ -53,36 +59,51 @@ fn solution23a() -> u32 {
     panic!("No solution found!");
 }
 
-fn insert_node(list: &mut Vec<SearchNode>, node: &SearchNode) {
-    if let Some(found) = get_node(list, node) {
-        // If the node is already in the list then lower its cost if necessary
-        if node.current_cost < found.current_cost {
-            found.current_cost = node.current_cost;
-            found.total_cost_estimate = node.total_cost_estimate;
+fn insert_node(list: &mut Vec<SearchNode>, new_node: &SearchNode) {
+    let current_node_idx = if let Some(found_idx) = find_node_idx(list, new_node) {
+        // If this node is already in our search vector then see if its cost might be revised
+        let found = list.get_mut(found_idx).unwrap();
+        // If the current cost is lower then we have nothing to do
+        if found.current_cost <= new_node.current_cost {
+            return;
         }
-    } else {
-        // Add to list if not previously present
-        list.push(node.clone());
-    }
 
-    // Re-sort the list, since we may have added a node or revised a cost. Sorting is done
-    // by "total" cost, a combination of the known cost to get there and the guess of
-    // the remaining distance
-    list.sort_by_key(|node| node.total_cost_estimate);
+        // We revise the current cost and return the idx of this found node
+        found.current_cost = new_node.current_cost;
+        found.total_cost_estimate = new_node.total_cost_estimate;
+
+        found_idx
+    } else {
+        // If the node isn't in the vector we push it on the end and return that last idx
+        list.push(new_node.clone());
+        list.len()-1
+    };
+
+    // We can now find the idx of where the node should be sorted to and rotate it to that position
+    // Whether Result is Ok or Error doesn't matter, only the difference between if another node
+    // was already identified with this cost estimate or if this is the first node with that estimate
+    let new_idx = list.binary_search_by_key(&new_node.total_cost_estimate, |x| x.total_cost_estimate)
+        .into_ok_or_err();
+    list[new_idx..=current_node_idx].rotate_right(1);
 }
 
-fn get_node<'a, 'b>(list: &'a mut [SearchNode], target: &'b SearchNode) -> Option<&'a mut SearchNode> {
+fn find_node_idx<'a, 'b>(list: &mut [SearchNode], target: &SearchNode) -> Option<usize> {
     list.iter_mut()
-        .find(|node| search_nodes_equal(node, target))
+        .position(|node| search_nodes_equal(node, target))
 }
 
 type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum AmphipodType {A, B, C, D}
+enum AmphipodType {
+    A,
+    B,
+    C,
+    D
+}
 
-#[derive (Clone, PartialEq, Eq, Hash)]
+#[derive (Clone, Eq)]
 struct State {
     // Required to be a BTreeMap as HashMap does not implement the Hash trait
     locs: BTreeMap<AmphipodType, CoordPair>
@@ -133,37 +154,39 @@ fn coord_pairs_equal(left: &CoordPair, right: &CoordPair) -> bool {
     (coords_equal(&left[0], &right[1]) && coords_equal(&left[1], &right[0]))
 }
 
-fn states_equal(left: &State, right: &State) -> bool {
-    each_amphipod_type().all(|amp_type|
-        left.locs.contains_key(amp_type) &&
-        right.locs.contains_key(amp_type) &&
-        coord_pairs_equal(&left.locs[amp_type], &right.locs[amp_type])
-    )
-}
-
 // Nodes in the graph search are considered the same if they have matching states, ignoring costs
 fn search_nodes_equal(left: &SearchNode, right: &SearchNode) -> bool {
-    states_equal(&left.state, &right.state)
+    left.state == right.state
 }
 
-fn each_amphipod_type() -> impl Iterator<Item=&'static AmphipodType> {
-    [AmphipodType::A, AmphipodType::B, AmphipodType::C, AmphipodType::D].iter()
+fn each_amphipod_type() -> impl Iterator<Item=AmphipodType> {
+    IntoIterator::into_iter([
+        AmphipodType::A,
+        AmphipodType::B,
+        AmphipodType::C,
+        AmphipodType::D
+    ])
 }
 
-fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
-    // Any of the Amphipod types can attempt to move a space
+fn each_amphipod (state: &State) -> impl Iterator<Item=(AmphipodType, Coord, Coord)>  + '_ {
+    let state_clone = state.clone();
     each_amphipod_type().map(
-        |amphipod_type| (amphipod_type, current.state.locs[amphipod_type])
+        move |amphipod_type| (amphipod_type, state_clone.locs[&amphipod_type])
     )
     // Check both Amphipods of the type
     .flat_map(|(amphipod_type, amphipod)| {
         vec!(
-            (amphipod_type, (amphipod[0], amphipod[1])),
-            (amphipod_type, (amphipod[1], amphipod[0]))
+            (amphipod_type, amphipod[0], amphipod[1]),
+            (amphipod_type, amphipod[1], amphipod[0])
         )
     })
+}
+
+fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
+    // Any of the Amphipods can attempt to move a space
+    each_amphipod(&current.state)
     // Check each possible destination
-    .flat_map(|(&amphipod_type, (amphipod, other_amphipod))| {
+    .flat_map(|(amphipod_type, amphipod, other_amphipod)| {
         let copied_amphipod_type = amphipod_type;
         CONNECTIONS.get(&amphipod).unwrap().iter()
             // Can't move to where another amphipod currently is
