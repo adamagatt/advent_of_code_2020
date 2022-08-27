@@ -90,7 +90,30 @@ struct State {
 
 impl Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{:?}, {:?}, {:?}, {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::C], self.locs[&AmphipodType::D])
+       write!(f, "[{:?} - {:?} - {:?} - {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::C], self.locs[&AmphipodType::D])
+        // write!(f, "[{:?} - {:?} - {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::D])
+    }
+}
+
+// Custom Hash needed to ensure states match in the HashMap even if both Amphipods
+// of the same type are swapped
+impl Hash for State {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        each_amphipod_type().for_each( |amp_type| {
+            let mut sorted_locs = self.locs[&amp_type];
+            sorted_locs.sort();
+            sorted_locs.hash(state);
+        });
+    }
+}
+
+impl PartialEq for State {
+    fn eq(&self, other: &Self) -> bool {
+        each_amphipod_type().all(|amp_type|
+            self.locs.contains_key(&amp_type) &&
+            other.locs.contains_key(&amp_type) && 
+            coord_pairs_equal(&self.locs[&amp_type], &other.locs[&amp_type])
+        )
     }
 }
 
