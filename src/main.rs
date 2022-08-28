@@ -20,10 +20,12 @@ fn main() {
                             solution();
                             println!();
                         }
-                    )
+                    );
+                    return;
                 } else if let Ok(choice) = line.trim().parse::<i32>() {
                     if SOLVED_PROBLEMS.contains_key(&choice) {
                         solutions::run(choice);
+                        return;
                     } else {
                         println!("Invalid number");
                     }
