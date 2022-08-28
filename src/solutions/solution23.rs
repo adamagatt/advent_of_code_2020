@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use itertools::iproduct;
 use std::cmp::{min, max};
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::fmt::Debug;
 
@@ -113,14 +113,26 @@ enum AmphipodType {
 
 #[derive (Clone, Eq)]
 struct State {
-    // Required to be a BTreeMap as HashMap does not implement the Hash trait
-    locs: BTreeMap<AmphipodType, CoordPair>
+    a: CoordPair,
+    b: CoordPair,
+    c: CoordPair,
+    d: CoordPair
+}
+
+impl State {
+    fn amphipods_of_type(&self, amp_type: AmphipodType) -> CoordPair {
+        match amp_type {
+            AmphipodType::A => self.a,
+            AmphipodType::B => self.b,
+            AmphipodType::C => self.c,
+            AmphipodType::D => self.d
+        }
+    }
 }
 
 impl Debug for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-       write!(f, "[{:?} - {:?} - {:?} - {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::C], self.locs[&AmphipodType::D])
-        // write!(f, "[{:?} - {:?} - {:?}]", self.locs[&AmphipodType::A], self.locs[&AmphipodType::B], self.locs[&AmphipodType::D])
+       write!(f, "[{:?} - {:?} - {:?} - {:?}]", self.amphipods_of_type(AmphipodType::A), self.amphipods_of_type(AmphipodType::B), self.amphipods_of_type(AmphipodType::C), self.amphipods_of_type(AmphipodType::D))
     }
 }
 
@@ -128,8 +140,8 @@ impl Debug for State {
 // of the same type are swapped
 impl Hash for State {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        each_amphipod_type().for_each( |amp_type| {
-            let mut sorted_locs = self.locs[&amp_type];
+        each_amp_type().for_each( |amp_type| {
+            let mut sorted_locs = self.amphipods_of_type(amp_type);
             sorted_locs.sort();
             sorted_locs.hash(state);
         });
@@ -138,10 +150,8 @@ impl Hash for State {
 
 impl PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
-        each_amphipod_type().all(|amp_type|
-            self.locs.contains_key(&amp_type) &&
-            other.locs.contains_key(&amp_type) && 
-            coord_pairs_equal(&self.locs[&amp_type], &other.locs[&amp_type])
+        each_amp_type().all(|amp_type|
+            coord_pairs_equal(&self.amphipods_of_type(amp_type), &other.amphipods_of_type(amp_type))
         )
     }
 }
@@ -167,7 +177,7 @@ fn search_nodes_equal(left: &SearchNode, right: &SearchNode) -> bool {
     left.state == right.state
 }
 
-fn each_amphipod_type() -> impl Iterator<Item=AmphipodType> {
+fn each_amp_type() -> impl Iterator<Item=AmphipodType> {
     IntoIterator::into_iter([
         AmphipodType::A,
         AmphipodType::B,
@@ -178,14 +188,14 @@ fn each_amphipod_type() -> impl Iterator<Item=AmphipodType> {
 
 fn each_amphipod (state: &State) -> impl Iterator<Item=(AmphipodType, Coord, Coord)>  + '_ {
     let state_clone = state.clone();
-    each_amphipod_type().map(
-        move |amphipod_type| (amphipod_type, state_clone.locs[&amphipod_type])
+    each_amp_type().map(
+        move |amp_type| (amp_type, state_clone.amphipods_of_type(amp_type))
     )
     // Check both Amphipods of the type
-    .flat_map(|(amphipod_type, amphipod)| {
+    .flat_map(|(amp_type, amphipod)| {
         vec!(
-            (amphipod_type, amphipod[0], amphipod[1]),
-            (amphipod_type, amphipod[1], amphipod[0])
+            (amp_type, amphipod[0], amphipod[1]),
+            (amp_type, amphipod[1], amphipod[0])
         )
     })
 }
@@ -194,23 +204,23 @@ fn find_next_search_nodes(current: &SearchNode) -> Vec<SearchNode> {
     // Any of the Amphipods can attempt to move a space
     each_amphipod(&current.state)
     // Check each possible destination
-    .flat_map(|(amphipod_type, amphipod, other_amphipod_of_type)| {
-        let amphipod_type_copy = amphipod_type;
+    .flat_map(|(amp_type, amphipod, other_amphipod_of_type)| {
+        let amp_type_copy = amp_type;
         let amphipod_copy = amphipod;
         CONNECTIONS.get(&amphipod).unwrap().iter()
             // Can't move if another amphipod is between the current location and destination
             .filter(move |(new_loc, _)| unblocked_by_other_amphipods(&current.state, amphipod_copy, new_loc))
             // Create new search node with state for moved amphipod
             .map(move |&(new_loc, distance)| {
-                let new_state = state_with_moved_location(new_loc, other_amphipod_of_type, &current.state, amphipod_type_copy);
-                search_node_for_state(distance, amphipod_type, new_state, current.current_cost)
+                let new_state = state_with_moved_location(new_loc, other_amphipod_of_type, &current.state, amp_type_copy);
+                search_node_for_state(distance, amp_type, new_state, current.current_cost)
             })
     })
     .collect()
 }
 
-fn search_node_for_state(distance: u32, amphipod_type: AmphipodType, new_state: State, previous_cost: u32) -> SearchNode {
-    let additional_cost = distance * MOVEMENT_COSTS[&amphipod_type];
+fn search_node_for_state(distance: u32, amp_type: AmphipodType, new_state: State, previous_cost: u32) -> SearchNode {
+    let additional_cost = distance * MOVEMENT_COSTS[&amp_type];
     let remaining_cost = estimate_remaining_cost(&new_state);
     SearchNode {
         state: new_state,
@@ -219,11 +229,16 @@ fn search_node_for_state(distance: u32, amphipod_type: AmphipodType, new_state: 
     }
 }
 
-fn state_with_moved_location(new_loc: (u32, u32), other_amphipod_of_type: (u32, u32), old_state: &State, amphipod_type_copy: AmphipodType) -> State {
+fn state_with_moved_location(new_loc: (u32, u32), other_amphipod_of_type: (u32, u32), old_state: &State, amp_type: AmphipodType) -> State {
     let mut new_amphipod_locations = [new_loc, other_amphipod_of_type];
     new_amphipod_locations.sort();
     let mut new_state = old_state.clone();
-    new_state.locs.insert(amphipod_type_copy, new_amphipod_locations);
+    match amp_type {
+        AmphipodType::A => new_state.a = new_amphipod_locations,
+        AmphipodType::B => new_state.b = new_amphipod_locations,
+        AmphipodType::C => new_state.c = new_amphipod_locations,
+        AmphipodType::D => new_state.d = new_amphipod_locations,
+    };
     new_state
 }
 
@@ -237,8 +252,8 @@ fn unblocked_by_other_amphipods(state: &State, amphipod_copy: (u32, u32), new_lo
 fn estimate_remaining_cost(state: &State) -> u32 {
     // Optimistic estimate of the movement cost required to get both amphipods of each colour to
     // their goals, ignoring all obstacles
-    each_amphipod_type().map(|amphipod_type|
-        (state.locs[&amphipod_type], GOAL.locs[&amphipod_type], MOVEMENT_COSTS[&amphipod_type])
+    each_amp_type().map(|amp_type|
+        (state.amphipods_of_type(amp_type), GOAL.amphipods_of_type(amp_type), MOVEMENT_COSTS[&amp_type])
     )
     .map(|(current_locs, goal_locs, movement_cost)|
         // Compare the two alternatives for matching amphipods to goal spaces
@@ -330,21 +345,17 @@ lazy_static! {
         });
 
     static ref INITIAL: State = State {
-        locs: BTreeMap::from([
-            (AmphipodType::A, [(1, 8), (2, 8)]),
-            (AmphipodType::B, [(1, 2), (2, 6)]),
-            (AmphipodType::C, [(1, 6), (2, 2)]),
-            (AmphipodType::D, [(1, 4), (2, 4)])
-        ])
+        a: [(1, 8), (2, 8)],
+        b: [(1, 2), (2, 6)],
+        c: [(1, 6), (2, 2)],
+        d: [(1, 4), (2, 4)]
     };
 
     static ref GOAL: State = State {
-        locs: BTreeMap::from([
-            (AmphipodType::A, [(1, 2), (2, 2)]),
-            (AmphipodType::B, [(1, 4), (2, 4)]),
-            (AmphipodType::C, [(1, 6), (2, 6)]),
-            (AmphipodType::D, [(1, 8), (2, 8)])
-        ])
+        a: [(1, 2), (2, 2)],
+        b: [(1, 4), (2, 4)],
+        c: [(1, 6), (2, 6)],
+        d: [(1, 8), (2, 8)]
     };
 
     static ref MOVEMENT_COSTS: HashMap::<AmphipodType, u32> = HashMap::from([
