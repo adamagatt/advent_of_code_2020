@@ -290,8 +290,9 @@ fn blocks_path(start: &Coord, dest: &Coord, obstacle: &Coord) -> bool {
         (lower..=higher).contains(&obstacle.1) && (
             // Is in the hallway and thus blocks them
             (obstacle.0 == 0) ||
-            // Is in the entrance of the room of the start or dest 
-            (obstacle.0 == 1 && (obstacle.1 == start.1 || obstacle.1 == dest.1))
+            // Is in the room with a y-coord at least as shallow as the destination  
+            (obstacle.1 == start.1 && obstacle.0 <= start.0) ||
+            (obstacle.1 == dest.1 && obstacle.0 <= dest.0)
         )
     }
 }
