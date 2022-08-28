@@ -51,7 +51,7 @@ fn solution23a() -> u32 {
             println!("Solution found after {} nodes", visited.len());
             return next_node.current_cost;
         } else {       
-            for discovered in find_next_states(&next_node) {
+            for discovered in find_next_search_nodes(&next_node) {
                 if !visited.contains(&discovered.state) {
                     upsert_node(&mut known, &discovered);
                 }
@@ -190,7 +190,7 @@ fn each_amphipod (state: &State) -> impl Iterator<Item=(AmphipodType, Coord, Coo
     })
 }
 
-fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
+fn find_next_search_nodes(current: &SearchNode) -> Vec<SearchNode> {
     // Any of the Amphipods can attempt to move a space
     each_amphipod(&current.state)
     // Check each possible destination
@@ -199,7 +199,7 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
         let amphipod_copy = amphipod;
         CONNECTIONS.get(&amphipod).unwrap().iter()
             // Can't move if another amphipod is between the current location and destination
-            .filter(move |(new_loc, _)| unblocked_by_other_amphipods(current, amphipod_copy, new_loc))
+            .filter(move |(new_loc, _)| unblocked_by_other_amphipods(&current.state, amphipod_copy, new_loc))
             // Create new search node with state for moved amphipod
             .map(move |&(new_loc, distance)| {
                 let new_state = state_with_moved_location(new_loc, other_amphipod_of_type, &current.state, amphipod_type_copy);
@@ -227,8 +227,8 @@ fn state_with_moved_location(new_loc: (u32, u32), other_amphipod_of_type: (u32, 
     new_state
 }
 
-fn unblocked_by_other_amphipods(current: &SearchNode, amphipod_copy: (u32, u32), new_loc: &(u32, u32)) -> bool {
-    each_amphipod(&current.state).all(|(_, other_amphipod, _)|
+fn unblocked_by_other_amphipods(state: &State, amphipod_copy: (u32, u32), new_loc: &(u32, u32)) -> bool {
+    each_amphipod(state).all(|(_, other_amphipod, _)|
         other_amphipod == amphipod_copy ||
         !blocks_path(&amphipod_copy, new_loc, &other_amphipod)
     )
@@ -271,7 +271,13 @@ fn blocks_path(start: &Coord, dest: &Coord, obstacle: &Coord) -> bool {
     } else {
         // Otherwise they must traverse via the hallway and might be blocked there
         let (lower, higher) = (min(start.1, dest.1), max(start.1, dest.1));
-        (obstacle.0 == 0) && ((lower..=higher).contains(&obstacle.1))
+        // Between (inclusive) x-coordinates of start and dest
+        (lower..=higher).contains(&obstacle.1) && (
+            // Is in the hallway and thus blocks them
+            (obstacle.0 == 0) ||
+            // Is in the entrance of the room of the start or dest 
+            (obstacle.0 == 1 && (obstacle.1 == start.1 || obstacle.1 == dest.1))
+        )
     }
 }
 
