@@ -1,4 +1,6 @@
 use lazy_static::lazy_static;
+use itertools::iproduct;
+use std::cmp::{min, max};
 use std::collections::{HashMap, HashSet, BTreeMap};
 use std::hash::Hash;
 use std::fmt::Debug;
@@ -92,13 +94,14 @@ fn upsert_node(list: &mut Vec<SearchNode>, new_node: &SearchNode) {
     list[new_idx..=current_node_idx].rotate_right(1);
 }
 
-fn find_node_idx<'a, 'b>(list: &mut [SearchNode], target: &SearchNode) -> Option<usize> {
+fn find_node_idx(list: &mut [SearchNode], target: &SearchNode) -> Option<usize> {
     list.iter_mut()
         .position(|node| search_nodes_equal(node, target))
 }
 
 type Coord = (u32, u32); // (y, x)
 type CoordPair = [Coord; 2];
+type ConnectionMap = HashMap<Coord, Vec<(Coord, u32)>>;
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum AmphipodType {
@@ -191,39 +194,44 @@ fn find_next_states(current: &SearchNode) -> Vec<SearchNode> {
     // Any of the Amphipods can attempt to move a space
     each_amphipod(&current.state)
     // Check each possible destination
-    .flat_map(|(amphipod_type, amphipod, other_amphipod)| {
-        let copied_amphipod_type = amphipod_type;
+    .flat_map(|(amphipod_type, amphipod, other_amphipod_of_type)| {
+        let amphipod_type_copy = amphipod_type;
+        let amphipod_copy = amphipod;
         CONNECTIONS.get(&amphipod).unwrap().iter()
-            // Can't move to where another amphipod currently is
-            .filter(|&new_loc| get_amphipod_in_space(&current.state, new_loc).is_none())
-            // Create new state with moved amphipod
-            .map(move |&new_loc| {
-                let mut new_amphipod_locations = [new_loc, other_amphipod];
-                new_amphipod_locations.sort();
-
-                let mut new_state = current.state.clone();
-                new_state.locs.insert(copied_amphipod_type, new_amphipod_locations);
-                new_state
-            })
-            // An intersection can't be occupied for two states in a row
-            .filter(|new_state|
-                !INTERSECTIONS.iter().any(|intersection|
-                    get_amphipod_in_space(new_state, intersection).is_some() &&
-                    get_amphipod_in_space(&current.state, intersection).is_some()
-                )
-            )
-            // Put state in new graph node with calculated/estimated costs
-            .map(move |new_state| {
-                let additional_cost = MOVEMENT_COSTS[&amphipod_type];
-                let remaining_cost = estimate_remaining_cost(&new_state);
-                SearchNode {
-                    state: new_state,
-                    current_cost: current.current_cost + additional_cost,
-                    total_cost_estimate: current.current_cost + additional_cost + remaining_cost
-                }
+            // Can't move if another amphipod is between the current location and destination
+            .filter(move |(new_loc, _)| unblocked_by_other_amphipods(current, amphipod_copy, new_loc))
+            // Create new search node with state for moved amphipod
+            .map(move |&(new_loc, distance)| {
+                let new_state = state_with_moved_location(new_loc, other_amphipod_of_type, &current.state, amphipod_type_copy);
+                search_node_for_state(distance, amphipod_type, new_state, current.current_cost)
             })
     })
     .collect()
+}
+
+fn search_node_for_state(distance: u32, amphipod_type: AmphipodType, new_state: State, previous_cost: u32) -> SearchNode {
+    let additional_cost = distance * MOVEMENT_COSTS[&amphipod_type];
+    let remaining_cost = estimate_remaining_cost(&new_state);
+    SearchNode {
+        state: new_state,
+        current_cost: previous_cost + additional_cost,
+        total_cost_estimate: previous_cost + additional_cost + remaining_cost
+    }
+}
+
+fn state_with_moved_location(new_loc: (u32, u32), other_amphipod_of_type: (u32, u32), old_state: &State, amphipod_type_copy: AmphipodType) -> State {
+    let mut new_amphipod_locations = [new_loc, other_amphipod_of_type];
+    new_amphipod_locations.sort();
+    let mut new_state = old_state.clone();
+    new_state.locs.insert(amphipod_type_copy, new_amphipod_locations);
+    new_state
+}
+
+fn unblocked_by_other_amphipods(current: &SearchNode, amphipod_copy: (u32, u32), new_loc: &(u32, u32)) -> bool {
+    each_amphipod(&current.state).all(|(_, other_amphipod, _)|
+        other_amphipod == amphipod_copy ||
+        !blocks_path(&amphipod_copy, new_loc, &other_amphipod)
+    )
 }
 
 fn estimate_remaining_cost(state: &State) -> u32 {
@@ -255,13 +263,16 @@ fn walk_distance(a: &Coord, b: &Coord) -> u32 {
     }
 }
 
-fn get_amphipod_in_space(state: &State, space: &Coord) -> Option<AmphipodType> {
-    state.locs.iter()
-        .flat_map(move |(amp_type, pair)|
-            pair.iter().map(move |coord| (*amp_type, coord))
-        )
-        .find(|&f| f.1 == space)
-        .map(|(amp_type, _)| amp_type)
+fn blocks_path(start: &Coord, dest: &Coord, obstacle: &Coord) -> bool {
+    if start.1 == dest.1 {
+        // Lined up vertically means they are within a room
+        let (lower, higher) = (min(start.0, dest.0), max(start.0, dest.0));
+        (obstacle.1 == start.1) && ((lower..=higher).contains(&obstacle.0))
+    } else {
+        // Otherwise they must traverse via the hallway and might be blocked there
+        let (lower, higher) = (min(start.1, dest.1), max(start.1, dest.1));
+        (obstacle.0 == 0) && ((lower..=higher).contains(&obstacle.1))
+    }
 }
 
 // Map is hard-coded and unchanging and so we can pre-calculate our
@@ -273,33 +284,11 @@ fn get_amphipod_in_space(state: &State, space: &Coord) -> Option<AmphipodType> {
 //   #########
 
 lazy_static! {
-    static ref CONNECTIONS: HashMap<Coord, Vec<Coord>> = HashMap::from([
-        ((0,  0), vec!((0,  1))),
-        ((0,  1), vec!((0,  0), (0,  2))),
-        ((0,  2), vec!((0,  1), (0,  3), (1,  2))),
-        ((0,  3), vec!((0,  2), (0,  4))),
-        ((0,  4), vec!((0,  3), (0,  5), (1,  4))),
-        ((0,  5), vec!((0,  4), (0,  6))),
-        ((0,  6), vec!((0,  5), (0,  7), (1,  6))),
-        ((0,  7), vec!((0,  6), (0,  8))),
-        ((0,  8), vec!((0,  7), (0,  9), (1,  8))),
-        ((0,  9), vec!((0,  8), (0, 10))),
-        ((0, 10), vec!((0,  9))),
-        ((1,  2), vec!((0,  2), (2,  2))),
-        ((2,  2), vec!((1,  2))),
-        ((1,  4), vec!((0,  4), (2,  4))),
-        ((2,  4), vec!((1,  4))),
-        ((1,  6), vec!((0,  6), (2,  6))),
-        ((2,  6), vec!((1,  6))),
-        ((1,  8), vec!((0,  8), (2,  8))),
-        ((2,  8), vec!((1,  8)))
-    ]);
-
     static ref INTERSECTIONS: HashSet<Coord> = HashSet::from([
         (0, 2), (0, 4), (0, 6), (0 ,8)
     ]);
 
-    static ref HALLWAY: HashSet<Coord> = HashSet::from([
+    static ref HALLWAY_STOPS: HashSet<Coord> = HashSet::from([
         (0, 0), (0, 1), (0, 3), (0 ,5), (0, 7), (0, 9), (0, 10)
     ]);
 
@@ -313,6 +302,26 @@ lazy_static! {
         ((1, 8), AmphipodType::D),
         ((2, 8), AmphipodType::D)
     ]);
+
+    // Precalculate connectivity and costs for moving from a room into the hallway and vice
+    // versa
+    static ref CONNECTIONS: ConnectionMap = 
+        iproduct!(
+            ROOMS.iter().map(|(coord, _)| coord),
+            HALLWAY_STOPS.iter()
+        )
+        // Get entries for both directions
+        .flat_map(|(start, dest)| {
+            let cost = walk_distance(start, dest);
+            vec!((*start, *dest, cost), (*dest, *start, cost))
+        })
+        .fold(HashMap::new(),
+            |mut map, (start, dest, cost)| {
+                map.entry(start)
+                    .or_insert(vec!())
+                    .push((dest, cost));
+            map
+        });
 
     static ref INITIAL: State = State {
         locs: BTreeMap::from([
