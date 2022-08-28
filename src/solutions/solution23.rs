@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use itertools::iproduct;
+use permute::permutations_of;
 use std::cmp::{min, max};
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
@@ -11,10 +12,14 @@ pub fn solution23 () {
 }
 
 fn solution23a() -> u32 {
-    graph_search(&INITIAL_A, &GOAL_A)
+    graph_search(&INITIAL_A, &GOAL_A, &CONNECTIONS_A)
 }
 
-fn graph_search(initial_state: &State, goal_state: &State) -> u32 {
+fn solution23b() -> u32 {
+    graph_search(&INITIAL_B, &GOAL_B, &CONNECTIONS_B)
+}
+
+fn graph_search(initial_state: &State, goal_state: &State, connection_map: &ConnectionMap) -> u32 {
     // States adjacent to those we have visited
     let mut known = Vec::<SearchNode>::new();
     // States we have visited and won't need to consider again
@@ -51,7 +56,7 @@ fn graph_search(initial_state: &State, goal_state: &State) -> u32 {
             println!("Solution found after {} nodes", visited.len());
             return next_node.current_cost;
         } else {       
-            for discovered in find_next_search_nodes(&next_node, goal_state) {
+            for discovered in find_next_search_nodes(&next_node, goal_state, connection_map) {
                 if !visited.contains(&discovered.state) {
                     upsert_node(&mut known, &discovered);
                 }
@@ -191,22 +196,24 @@ fn each_amphipod(state: &State) -> impl Iterator<Item=(AmphipodType, Coord, Vec<
         move |amp_type| (amp_type, state_clone.amphipods_of_type(amp_type))
     )
     // Check both Amphipods of the type
-    .flat_map(|(amp_type, amphipod)| {
-        vec!(
-            (amp_type, amphipod[0], vec!(amphipod[1])),
-            (amp_type, amphipod[1], vec!(amphipod[0]))
-        )
+    .flat_map(|(amp_type, amphipods)| {
+        amphipods.iter()
+            .map(|&amphipod| {
+                let mut other_amphipods = amphipods.clone();
+                other_amphipods.retain(|&amp| amp != amphipod);
+                (amp_type, amphipod, other_amphipods)
+            }).collect::<Vec<_>>()
     })
 }
 
-fn find_next_search_nodes(current: &SearchNode, goal_state: &State) -> Vec<SearchNode> {
+fn find_next_search_nodes(current: &SearchNode, goal_state: &State, connection_map: &ConnectionMap) -> Vec<SearchNode> {
     // Any of the Amphipods can attempt to move a space
     each_amphipod(&current.state)
     // Check each possible destination
     .flat_map(|(amp_type, amphipod, other_amphipods_of_type)| {
         let amp_type_copy = amp_type;
         let amphipod_copy = amphipod;
-        CONNECTIONS_A.get(&amphipod).unwrap().iter()
+        connection_map.get(&amphipod).unwrap().iter()
             // Can't move if another amphipod is between the current location and destination
             .filter(move |(new_loc, _)| unblocked_by_other_amphipods(&current.state, amphipod_copy, new_loc))
             // Won't move into a room unless it is our destination and has no amphipods of other types in it
@@ -277,11 +284,16 @@ fn estimate_remaining_cost(state: &State, goal_state: &State) -> u32 {
         (state.amphipods_of_type(amp_type), goal_state.amphipods_of_type(amp_type), MOVEMENT_COSTS[&amp_type])
     )
     .map(|(current_locs, goal_locs, movement_cost)|
-        // Compare the two alternatives for matching amphipods to goal spaces
-        std::cmp::min(
-            walk_distance(&current_locs[0], &goal_locs[0]) + walk_distance(&current_locs[1], &goal_locs[1]),
-            walk_distance(&current_locs[0], &goal_locs[1]) + walk_distance(&current_locs[1], &goal_locs[0])
-        ) * movement_cost
+        // Compare all alternatives for matching amphipods to goal spaces
+        permutations_of(&current_locs)
+            .map(|permutation|
+                permutation.zip(goal_locs.iter())
+                    .map(|(amp_loc, goal_loc)| walk_distance(amp_loc, goal_loc))
+                    .sum::<u32>()
+            )
+            // We want the shortest distance for matching of amphipods to goals, and then
+            // multiply by movement cost
+            .min().unwrap() * movement_cost
     )
     .sum()
 }
