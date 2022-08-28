@@ -32,10 +32,6 @@ fn solution23a() -> u32 {
         let next_node = known.remove(0);
         visited.insert(next_node.state.clone());
 
-        // dbg!(known.len());
-        // dbg!(visited.len());
-        // dbg!(&next_node.state, &next_node.current_cost, &next_node.total_cost_estimate);
-
         if (visited.len() - vis_count) >= 1000 {
             vis_count = visited.len();
             println!("{}", vis_count);
@@ -210,6 +206,8 @@ fn find_next_search_nodes(current: &SearchNode) -> Vec<SearchNode> {
         CONNECTIONS.get(&amphipod).unwrap().iter()
             // Can't move if another amphipod is between the current location and destination
             .filter(move |(new_loc, _)| unblocked_by_other_amphipods(&current.state, amphipod_copy, new_loc))
+            // Won't move into a room unless it is our destination and has no amphipods of other types in it
+            .filter(move |(new_loc, _)| only_move_to_room_if_valid(&current.state, amp_type_copy, new_loc))
             // Create new search node with state for moved amphipod
             .map(move |&(new_loc, distance)| {
                 let new_state = state_with_moved_location(new_loc, other_amphipod_of_type, &current.state, amp_type_copy);
@@ -242,10 +240,29 @@ fn state_with_moved_location(new_loc: (u32, u32), other_amphipod_of_type: (u32, 
     new_state
 }
 
-fn unblocked_by_other_amphipods(state: &State, amphipod_copy: (u32, u32), new_loc: &(u32, u32)) -> bool {
+fn unblocked_by_other_amphipods(state: &State, amphipod: (u32, u32), dest: &(u32, u32)) -> bool {
     each_amphipod(state).all(|(_, other_amphipod, _)|
-        other_amphipod == amphipod_copy ||
-        !blocks_path(&amphipod_copy, new_loc, &other_amphipod)
+        other_amphipod == amphipod ||
+        !blocks_path(&amphipod, dest, &other_amphipod)
+    )
+}
+
+fn only_move_to_room_if_valid(state: &State, amp_type: AmphipodType, dest: &(u32, u32)) -> bool {
+    // Early success if we are not moving to a room
+    if dest.0 == 0 {
+        return true;
+    }
+    let valid_room_idx = match amp_type {
+        AmphipodType::A => 2,
+        AmphipodType::B => 4,
+        AmphipodType::C => 6,
+        AmphipodType::D => 8
+    };
+    // Destination is a valid room for our type
+    dest.1 == valid_room_idx &&
+    // No amphipods of the wrong type are in our room
+    each_amphipod(state).all(|(other_amp_type, loc, _)|
+        other_amp_type == amp_type || loc.1 != dest.1
     )
 }
 
