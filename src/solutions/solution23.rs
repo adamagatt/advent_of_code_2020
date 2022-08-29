@@ -8,19 +8,19 @@ use std::hash::Hash;
 use std::fmt::Debug;
 
 pub fn solution23 () {
-    // println!("{}", solution23a());
-    println!("{}", solution23b());
+    solution23a();
+    solution23b();
 }
 
-fn solution23a() -> u32 {
+fn solution23a() {
     graph_search(&INITIAL_A, &GOAL_A, &CONNECTIONS_A)
 }
 
-fn solution23b() -> u32 {
+fn solution23b() {
     graph_search(&INITIAL_B, &GOAL_B, &CONNECTIONS_B)
 }
 
-fn graph_search<const T: usize>(initial_state: &State<T>, goal_state: &State<T>, connection_map: &ConnectionMap) -> u32 {
+fn graph_search<const T: usize>(initial_state: &State<T>, goal_state: &State<T>, connection_map: &ConnectionMap) {
     // States adjacent to those we have visited
     let mut known = Vec::<SearchNode<T>>::new();
     // States we have visited and won't need to consider again
@@ -35,27 +35,27 @@ fn graph_search<const T: usize>(initial_state: &State<T>, goal_state: &State<T>,
         }
     );
 
-    let mut vis_count = 0;
+    let mut visited_count = 0;
     let mut best_remaining = 999999999;
 
     while !known.is_empty() {
         let next_node = known.remove(0);
         visited.insert(next_node.state.clone());
 
-        if (visited.len() - vis_count) >= 1000 {
-            vis_count = visited.len();
-            println!("{}", vis_count);
+        if (visited.len() - visited_count) >= 1000 {
+            visited_count = visited.len();
+            println!("{} nodes visited", visited_count);
         }
+
         if (next_node.total_cost_estimate-next_node.current_cost) < best_remaining {
             best_remaining = next_node.total_cost_estimate-next_node.current_cost;
-            println!("NEW BEST: {}", best_remaining);
-            dbg!(&next_node.state);
+            println!("New best state (cost {})", best_remaining);
         }
 
 
         if next_node.state.eq(goal_state) { // .eq() required instead of == due to lazy_static goal state
-            println!("Solution found after {} nodes", visited.len());
-            return next_node.current_cost;
+            println!("Solution found! (Cost {} after {} nodes)", next_node.current_cost, visited.len());
+            return;
         } else {       
             for discovered in find_next_search_nodes(&next_node, goal_state, connection_map) {
                 if !visited.contains(&discovered.state) {
@@ -337,7 +337,7 @@ fn blocks_path(start: &Coord, dest: &Coord, obstacle: &Coord) -> bool {
     }
 }
 
-// ,// Precalculate connectivity and costs for moving from a room into the hallway and vice
+// Precalculate connectivity and costs for moving from a room into the hallway and vice
 // versa
 fn make_connection_map(hallway_spaces: &HashSet<Coord>, room_spaces: &HashMap<Coord, AmphipodType>) -> ConnectionMap { 
     iproduct!(
