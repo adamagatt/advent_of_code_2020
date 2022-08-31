@@ -105,6 +105,7 @@ fn join_counters(counter1: Counter, counter2: Counter) -> Counter {
 fn calculate_final_counter(template: &str, generation: &Generation) -> Counter {
     // First we look up the last generation counter to each pairwise polymer of
     // the input string, and then combine all those counters together
+    // NOTE: array_windows() might be more elegant here but is not supported for chars()
     let mut final_counter = template.chars().zip(template[1..].chars())
         .map(|chars| generation[&chars].clone())
         .reduce(join_counters)

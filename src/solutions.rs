@@ -59,11 +59,10 @@ pub fn run(choice: i32) {
 pub fn make_choice_string() -> String {
     let valid_choices: Vec<&i32> = SOLVED_PROBLEMS.keys().collect();
 
-    let (mut run_starts, mut run_ends) = valid_choices.iter()
-        .zip(&valid_choices[1..])
+    let (mut run_starts, mut run_ends) = valid_choices.array_windows()
         .fold(
             (Vec::<&i32>::new(), Vec::<&i32>::new()),
-            |(mut run_starts, mut run_ends), (&prev, &next)| {
+            |(mut run_starts, mut run_ends), &[prev, next]| {
                 if (prev + 1) != *next {
                     run_starts.push(next);
                     run_ends.push(prev);
@@ -71,8 +70,8 @@ pub fn make_choice_string() -> String {
                 (run_starts, run_ends)
             }
         );
-    run_starts.insert(0, &valid_choices[0]);
-    run_ends.push(&valid_choices[valid_choices.len()-1]);
+    run_starts.insert(0, valid_choices[0]);
+    run_ends.push(valid_choices[valid_choices.len()-1]);
     
     run_starts.iter().zip(run_ends.iter())
         .map(|(&start, &end)|

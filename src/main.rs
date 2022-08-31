@@ -1,3 +1,4 @@
+#![feature(array_windows)] // Solution 1
 #![feature(drain_filter)] // Solution 22
 #![feature(result_into_ok_or_err)] // Solution 23
 

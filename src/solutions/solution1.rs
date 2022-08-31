@@ -7,9 +7,8 @@ pub fn solution1() {
 }
 
 fn solution1a(depths: &[i32]) -> i32 {
-    depths[1..].iter() // Zip slice [1..] with slice starting from beginning
-        .zip(depths.iter())
-        .filter(|(a, b)| **a > **b)
+    depths.array_windows()
+        .filter(|&&[a, b]| a < b)
         .count() as i32
 }
 
@@ -22,8 +21,7 @@ fn solution1a(depths: &[i32]) -> i32 {
  * in essence we can continue comparing individual values, just with an offset of 3.
  */
 fn solution1b(depths: &[i32]) -> i32 {
-    depths[3..].iter()
-        .zip(depths.iter())
-        .filter(|(a, b)| **a > **b)
+    depths.windows(4)
+        .filter(|&window| window[0] < window[3])
         .count() as i32
 }
